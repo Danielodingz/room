@@ -5,22 +5,23 @@ export const provider = new Provider({
     nodeUrl: constants.NetworkName.SN_SEPOLIA,
 });
 
-// Admin credentials from environment variables
-const adminAddress = process.env.STARKNET_ADMIN_ADDRESS || "";
-const adminPrivateKey = process.env.STARKNET_ADMIN_PRIVATE_KEY || "";
-
+// Admin credentials from environment variables (read dynamically)
 let adminAccount: Account | null = null;
 
-if (adminAddress && adminPrivateKey) {
-    // @ts-ignore - Supress TS error about expected arguments for Account
-    adminAccount = new Account(provider, adminAddress, adminPrivateKey, "1");
-}
-
 export const getAdminAccount = () => {
-    if (!adminAccount) {
-        console.warn("Starknet admin account not configured. Transactions will be simulated.");
+    if (adminAccount) return adminAccount;
+
+    const adminAddress = process.env.STARKNET_ADMIN_ADDRESS || "";
+    const adminPrivateKey = process.env.STARKNET_ADMIN_PRIVATE_KEY || "";
+
+    if (adminAddress && adminPrivateKey) {
+        // @ts-ignore - Supress TS error about expected arguments for Account
+        adminAccount = new Account(provider, adminAddress, adminPrivateKey, "1");
+        return adminAccount;
     }
-    return adminAccount;
+
+    console.warn("Starknet admin account not configured. Transactions will be simulated.");
+    return null;
 };
 
 // USDC Testnet Address (Mock USDC for Sepolia)
