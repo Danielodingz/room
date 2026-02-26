@@ -21,21 +21,23 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 export function createMeeting(meetingId: string, hostAddress: string): string {
-    meetings.set(meetingId, {
-        id: meetingId,
+    const normalizedId = meetingId.toLowerCase();
+    meetings.set(normalizedId, {
+        id: normalizedId,
         host: hostAddress,
         createdAt: Date.now(),
         status: 'active'
     });
-    return meetingId;
+    return normalizedId;
 }
 
 export function getMeeting(meetingId: string): Meeting | undefined {
-    return meetings.get(meetingId);
+    return meetings.get(meetingId.toLowerCase());
 }
 
 export function endMeeting(meetingId: string, hostAddress: string): boolean {
-    const meeting = meetings.get(meetingId);
+    const normalizedId = meetingId.toLowerCase();
+    const meeting = meetings.get(normalizedId);
 
     if (!meeting) {
         return false;
@@ -46,12 +48,12 @@ export function endMeeting(meetingId: string, hostAddress: string): boolean {
     }
 
     meeting.status = 'ended';
-    meetings.set(meetingId, meeting);
+    meetings.set(normalizedId, meeting);
 
     // After setting it to ended, we clean it up from memory to prevent leaks
     // For a hackathon timeline we could just leave it, but this is safer
     setTimeout(() => {
-        meetings.delete(meetingId);
+        meetings.delete(normalizedId);
     }, 60000); // Wait 1 minute before completely wiping so late-joiners still see "ended" 403 instead of 404
 
     return true;

@@ -205,6 +205,26 @@ function RoomInterface({
     const [chatInput, setChatInput] = useState("");
     const [activeReaction, setActiveReaction] = useState<{ emoji: string, from: string } | null>(null);
 
+    // Pinning State
+    const [focusedTrack, setFocusedTrack] = useState<TrackReferenceOrPlaceholder | null>(null);
+
+    const handlePin = (e: any) => {
+        // Toggle off if clicking the already focused person
+        if (focusedTrack && focusedTrack.participant.identity === e.participant.identity) {
+            setFocusedTrack(null);
+            return;
+        }
+
+        // Pin the selected person, structurally typing a TrackReference
+        if (e.participant) {
+            setFocusedTrack({
+                participant: e.participant,
+                publication: e.track,
+                source: e.track?.source || Track.Source.Camera
+            });
+        }
+    };
+
     // LiveKit Hooks (Must be within LiveKitRoom)
     const { localParticipant, isMicrophoneEnabled, isCameraEnabled, isScreenShareEnabled } = useLocalParticipant();
     const { send: sendChatMessage, chatMessages, isSending } = useChat();
@@ -375,20 +395,29 @@ function RoomInterface({
                 <div className="flex-1 flex flex-col relative bg-[#0F0F10] transition-all duration-300">
                     <div className="w-full h-full p-4 pt-20 pb-4 relative flex">
                         {tracks.length > 0 ? (
-                            hasScreenShare ? (
+                            (hasScreenShare || focusedTrack) ? (
                                 <FocusLayoutContainer className="w-full h-full flex flex-col md:flex-row gap-4">
-                                    <div className="flex-1 h-full min-h-[60%]">
-                                        <FocusLayout trackRef={screenShareTracks[0]} />
+                                    <div className="flex-1 h-full min-h-[60%] relative group">
+                                        <FocusLayout trackRef={hasScreenShare ? screenShareTracks[0] : focusedTrack!} />
+                                        {!hasScreenShare && (
+                                            <button
+                                                onClick={() => setFocusedTrack(null)}
+                                                className="absolute top-4 right-4 z-50 bg-black/60 p-2 rounded-full hover:bg-black/80 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                                                title="Unpin View"
+                                            >
+                                                <X size={20} />
+                                            </button>
+                                        )}
                                     </div>
                                     <div className="md:w-[240px] md:h-full h-[120px] w-full shrink-0">
                                         <CarouselLayout tracks={tracks as TrackReferenceOrPlaceholder[]}>
-                                            <ParticipantTile />
+                                            <ParticipantTile onParticipantClick={handlePin} />
                                         </CarouselLayout>
                                     </div>
                                 </FocusLayoutContainer>
                             ) : (
                                 <GridLayout tracks={tracks as TrackReferenceOrPlaceholder[]} style={{ height: '100%', width: '100%' }}>
-                                    <ParticipantTile />
+                                    <ParticipantTile onParticipantClick={handlePin} />
                                 </GridLayout>
                             )
                         ) : (
