@@ -182,6 +182,7 @@ export default function MeetingRoomPage() {
                 setHasBeenAdmitted={setHasBeenAdmitted}
                 waitingGuests={waitingGuests}
                 setWaitingGuests={setWaitingGuests}
+                onAdmittedToken={setToken}
             />
             <RoomAudioRenderer />
         </LiveKitRoom>
@@ -198,7 +199,8 @@ function RoomInterface({
     hasBeenAdmitted,
     setHasBeenAdmitted,
     waitingGuests,
-    setWaitingGuests
+    setWaitingGuests,
+    onAdmittedToken
 }: {
     meetingId: string,
     address?: string,
@@ -208,7 +210,8 @@ function RoomInterface({
     hasBeenAdmitted: boolean,
     setHasBeenAdmitted: (v: boolean) => void,
     waitingGuests: Array<{ identity: string, name: string }>,
-    setWaitingGuests: React.Dispatch<React.SetStateAction<Array<{ identity: string, name: string }>>>
+    setWaitingGuests: React.Dispatch<React.SetStateAction<Array<{ identity: string, name: string }>>>,
+    onAdmittedToken: (newToken: string) => void
 }) {
     const [currentTime, setCurrentTime] = useState(new Date());
     const [isHandRaised, setIsHandRaised] = useState(false);
@@ -250,12 +253,39 @@ function RoomInterface({
             }
 
             if (!isHost && data.type === 'admit_guest' && data.targetIdentity === localParticipant.identity) {
-                setHasBeenAdmitted(true);
+                // We must acquire a new token that grants canPublish: true, or LiveKit will ignore our media
+                fetch("/api/room/admit", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        roomId: meetingId,
+                        walletAddress: localParticipant.identity,
+                        displayName: localParticipant.name
+                    })
+                })
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.token) {
+                            onAdmittedToken(data.token);
+                            setHasBeenAdmitted(true);
+
+                            // Force hardware engagement
+                            setTimeout(() => {
+                                try {
+                                    localParticipant.setCameraEnabled(true);
+                                    localParticipant.setMicrophoneEnabled(true);
+                                } catch (err) {
+                                    console.error("Failed to enable tracks after admit", err);
+                                }
+                            }, 500);
+                        }
+                    })
+                    .catch(err => console.error("Failed to upgrade token:", err));
             }
         } catch (e) {
             // Ignore non-JSON or other system messages
         }
-    }, [systemMessage, isHost, localParticipant.identity, setWaitingGuests, setHasBeenAdmitted]);
+    }, [systemMessage, isHost, localParticipant, setWaitingGuests, setHasBeenAdmitted, meetingId, onAdmittedToken]);
 
     // Continuously broadcast presence to the host if stuck in the waiting room
     useEffect(() => {
