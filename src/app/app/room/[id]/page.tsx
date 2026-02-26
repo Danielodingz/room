@@ -228,7 +228,6 @@ function RoomInterface({
     const { send: sendChatMessage, chatMessages, isSending } = useChat();
     const { send: sendReactionData, message: incomingReaction } = useDataChannel("reactions");
     const { send: sendHandUpdate, message: handMessage } = useDataChannel("hands");
-    const { send: sendSystemMessage, message: systemMessage } = useDataChannel("system");
     const connectionState = useConnectionState();
 
     // Host & Waiting Room Logic
@@ -237,78 +236,92 @@ function RoomInterface({
     // Explicitly lock down the guest if they aren't admitted yet
     const isInWaitingRoom = connectionState === ConnectionState.Connected && !isHost && !hasBeenAdmitted;
 
-    // Process specialized data channel messages for the Waitlist flow
+    // Robust Server-Side Polling for Waitlist
+    // DataChannels are often blocked by corporate firewalls/VPNs. Polling the LiveKit API directly ensures 100% sync.
     useEffect(() => {
-        if (!systemMessage) return;
+        if (!isHost || connectionState !== ConnectionState.Connected) return;
+
+        const checkWaitlist = async () => {
+            try {
+                const res = await fetch(`/api/room/waitlist?roomId=${meetingId}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.waitingGuests) {
+                        setWaitingGuests(data.waitingGuests);
+                    }
+                }
+            } catch (err) {
+                console.error("Failed to poll waitlist", err);
+            }
+        };
+
+        checkWaitlist(); // Initial check
+        const interval = setInterval(checkWaitlist, 3000);
+        return () => clearInterval(interval);
+    }, [isHost, connectionState, meetingId, setWaitingGuests]);
+
+    // Guest Polling to check if Host has admitted them
+    useEffect(() => {
+        if (!isInWaitingRoom || isHost) return;
+
+        const checkAdmissionStatus = async () => {
+            try {
+                const res = await fetch(`/api/room/waitlist/status?roomId=${meetingId}&identity=${localParticipant.identity}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.admitted) {
+                        // The server says we're admitted! Acquire the new token.
+                        fetch("/api/room/admit", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                                roomId: meetingId,
+                                walletAddress: localParticipant.identity,
+                                displayName: localParticipant.name
+                            })
+                        })
+                            .then(res => res.json())
+                            .then(data => {
+                                if (data.token) {
+                                    onAdmittedToken(data.token);
+                                    setHasBeenAdmitted(true);
+
+                                    // Force hardware engagement
+                                    setTimeout(() => {
+                                        try {
+                                            localParticipant.setCameraEnabled(true);
+                                            localParticipant.setMicrophoneEnabled(true);
+                                        } catch (err) {
+                                            console.error("Failed to enable tracks after admit", err);
+                                        }
+                                    }, 500);
+                                }
+                            })
+                            .catch(err => console.error("Failed to upgrade token:", err));
+                    }
+                }
+            } catch (err) {
+                console.error("Failed to check admission status", err);
+            }
+        };
+
+        const interval = setInterval(checkAdmissionStatus, 3000);
+        return () => clearInterval(interval);
+    }, [isInWaitingRoom, isHost, meetingId, localParticipant, onAdmittedToken, setHasBeenAdmitted]);
+
+    const handleAdmitGuest = async (guestIdentity: string) => {
+        // Optimistically remove from UI
+        setWaitingGuests(prev => prev.filter(g => g.identity !== guestIdentity));
 
         try {
-            const data = JSON.parse(new TextDecoder().decode(systemMessage.payload));
-            console.log("[System Channel] Received message:", data);
-
-            if (isHost && data.type === 'guest_waiting') {
-                setWaitingGuests((prev: Array<{ identity: string, name: string }>) => {
-                    if (prev.find((g: any) => g.identity === data.identity)) return prev;
-                    return [...prev, { identity: data.identity, name: data.name }];
-                });
-            }
-
-            if (!isHost && data.type === 'admit_guest' && data.targetIdentity === localParticipant.identity) {
-                // We must acquire a new token that grants canPublish: true, or LiveKit will ignore our media
-                fetch("/api/room/admit", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        roomId: meetingId,
-                        walletAddress: localParticipant.identity,
-                        displayName: localParticipant.name
-                    })
-                })
-                    .then(res => res.json())
-                    .then(data => {
-                        if (data.token) {
-                            onAdmittedToken(data.token);
-                            setHasBeenAdmitted(true);
-
-                            // Force hardware engagement
-                            setTimeout(() => {
-                                try {
-                                    localParticipant.setCameraEnabled(true);
-                                    localParticipant.setMicrophoneEnabled(true);
-                                } catch (err) {
-                                    console.error("Failed to enable tracks after admit", err);
-                                }
-                            }, 500);
-                        }
-                    })
-                    .catch(err => console.error("Failed to upgrade token:", err));
-            }
-        } catch (e) {
-            // Ignore non-JSON or other system messages
+            await fetch("/api/room/waitlist/status", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ roomId: meetingId, identity: guestIdentity, action: "admit" })
+            });
+        } catch (err) {
+            console.error("Failed to dispatch admit command", err);
         }
-    }, [systemMessage, isHost, localParticipant, setWaitingGuests, setHasBeenAdmitted, meetingId, onAdmittedToken]);
-
-    // Continuously broadcast presence to the host if stuck in the waiting room
-    useEffect(() => {
-        if (isInWaitingRoom && connectionState === ConnectionState.Connected) {
-            console.log("[System Channel] Started broadcasting guest presence.");
-            const interval = setInterval(() => {
-                const msg = JSON.stringify({
-                    type: 'guest_waiting',
-                    identity: localParticipant.identity,
-                    name: localParticipant.name || "Guest"
-                });
-                sendSystemMessage(new TextEncoder().encode(msg), { reliable: true });
-                console.log("[System Channel] Ping sent.");
-            }, 3000);
-            return () => clearInterval(interval);
-        }
-    }, [isInWaitingRoom, connectionState, localParticipant, sendSystemMessage]);
-
-    const handleAdmitGuest = (guestIdentity: string) => {
-        const msg = JSON.stringify({ type: 'admit_guest', targetIdentity: guestIdentity });
-        sendSystemMessage(new TextEncoder().encode(msg), { reliable: true });
-        // Remove from local waiting list
-        setWaitingGuests((prev: Array<{ identity: string, name: string }>) => prev.filter((g: any) => g.identity !== guestIdentity));
     };
 
     // LiveKit Track Hooks for rendering grid layout
