@@ -213,6 +213,30 @@ function RoomInterface({
     const connectionState = useConnectionState();
     const participants = useParticipants(); // Added useParticipants
 
+    // Determine Role from Metadata
+    const role = localParticipant?.metadata ? JSON.parse(localParticipant.metadata).role : "participant";
+    const isHost = role === "host";
+
+    const handleEndMeetingGlobally = async () => {
+        try {
+            const res = await fetch("/api/room/end", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ roomId: meetingId, walletAddress: address })
+            });
+            if (res.ok) {
+                // Instantly force local client to disconnect and redirect
+                onLeave();
+            } else {
+                console.error("Failed to end meeting", await res.text());
+                onLeave(); // fallback leave just in case
+            }
+        } catch (err) {
+            console.error("Error ending meeting:", err);
+            onLeave();
+        }
+    }
+
     // LiveKit Track Hooks for rendering grid layout
     const tracks = useTracks(
         [
@@ -572,17 +596,28 @@ function RoomInterface({
                 </div>
 
                 {/* Right: End Meeting */}
-                <div className="min-w-[120px] flex justify-end">
+                <div className="min-w-[120px] flex justify-end gap-2">
+                    {isHost && (
+                        <button
+                            onClick={handleEndMeetingGlobally}
+                            className="flex flex-col items-center gap-1.5 px-6 py-2 bg-red-500 hover:bg-red-600 group transition-all rounded-2xl border border-red-500/20 shadow-lg shadow-red-500/20 active:scale-95"
+                            title="End meeting for all participants"
+                        >
+                            <PhoneOff size={22} className="text-white transition-colors" />
+                            <span className="text-[10px] font-bold text-white uppercase tracking-[0.1em]">End All</span>
+                        </button>
+                    )}
                     <button
                         onClick={onLeave}
-                        className="flex flex-col items-center gap-1.5 px-6 py-2 bg-red-500/10 hover:bg-red-500 group transition-all rounded-2xl border border-red-500/20 shadow-lg shadow-red-500/10 active:scale-95"
+                        className="flex flex-col items-center gap-1.5 px-6 py-2 bg-white/10 hover:bg-white/20 group transition-all rounded-2xl border border-white/5 active:scale-95"
+                        title="Leave meeting"
                     >
-                        <PhoneOff size={22} className="text-red-500 group-hover:text-white transition-colors rotate-[135deg]" />
-                        <span className="text-[10px] font-bold text-red-500 group-hover:text-white uppercase tracking-[0.1em]">End</span>
+                        <PhoneOff size={22} className="text-gray-300 group-hover:text-white transition-colors rotate-[135deg]" />
+                        <span className="text-[10px] font-bold text-gray-300 group-hover:text-white uppercase tracking-[0.1em]">Leave</span>
                     </button>
                 </div>
             </div>
-        </div >
+        </div>
     );
 }
 

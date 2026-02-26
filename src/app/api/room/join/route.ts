@@ -1,60 +1,53 @@
 import { NextRequest, NextResponse } from "next/server";
-import { AccessToken } from "livekit-server-sdk"; export async function POST(req: NextRequest) {
+import { getMeeting } from "@/lib/meetings";
+import { generateMeetingToken } from "@/lib/livekit";
+
+export async function POST(req: NextRequest) {
     try {
         const body = await req.json();
-        const { roomId, walletAddress, displayName } = body;
+        const { roomId, walletAddress, displayName } = body; // Map meetingId param to roomId logic since frontend relies on id param
 
-        // Validate both roomId and walletAddress
-        if (
-            !roomId || typeof roomId !== "string" ||
-            !walletAddress || typeof walletAddress !== "string"
-        ) {
+        if (!roomId || typeof roomId !== "string" || !walletAddress || typeof walletAddress !== "string") {
             return NextResponse.json(
                 { error: "Invalid or missing roomId or walletAddress" },
                 { status: 400 }
             );
         }
 
-        // Access environment variables securely on the server
-        const apiKey = process.env.LIVEKIT_API_KEY;
-        const apiSecret = process.env.LIVEKIT_API_SECRET;
-        const livekitUrl = process.env.LIVEKIT_URL;
+        // Validate meeting exists in memory
+        const meeting = getMeeting(roomId);
 
-        if (!apiKey || !apiSecret || !livekitUrl) {
+        if (!meeting) {
             return NextResponse.json(
-                { error: "Server misconfiguration: Missing LiveKit credentials" },
-                { status: 500 }
+                { error: "Meeting not found" },
+                { status: 404 }
             );
         }
 
-        // Create LiveKit AccessToken
-        const token = new AccessToken(apiKey, apiSecret, {
-            identity: walletAddress,
-            name: displayName || "Guest",
-            metadata: JSON.stringify({ isHost: false })
-        });
+        if (meeting.status === "ended") {
+            return NextResponse.json(
+                { error: "Meeting has ended" },
+                { status: 403 }
+            );
+        }
 
-        // Add grant matching the host's permissions
-        token.addGrant({
-            roomJoin: true,
-            room: roomId,
-            canPublish: true, // Allow direct A/V publishing
-            canSubscribe: true,
-            canPublishData: true
-        });
+        // Generate the LiveKit Token explicitly for the Participant Role
+        const { token, livekitUrl } = await generateMeetingToken(
+            roomId,
+            walletAddress,
+            displayName || "Guest",
+            "participant" // <-- Crucial Role Injection
+        );
 
-        // Generate JWT
-        const jwt = await token.toJwt();
-
-        // Return the response without exposing secrets
         return NextResponse.json({
-            token: jwt,
+            token,
             livekitUrl,
         });
+
     } catch (error: any) {
         console.error("Error joining room:", error);
         return NextResponse.json(
-            { error: error?.message || "Internal server error", stack: error?.stack },
+            { error: error?.message || "Internal server error" },
             { status: 500 }
         );
     }

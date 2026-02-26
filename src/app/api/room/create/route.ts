@@ -1,14 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { AccessToken } from "livekit-server-sdk";
-import { v4 as uuidv4 } from "uuid";
-import { handleRoomCreationPayment } from "@/lib/starknet";
+import { createMeeting } from "@/lib/meetings";
+import { generateMeetingToken } from "@/lib/livekit";
 
 export async function POST(req: NextRequest) {
     try {
         const body = await req.json();
         const { walletAddress, displayName } = body;
 
-        // Validate walletAddress exists and is a string
+        // Validate walletAddress as it represents the Host's identity
         if (!walletAddress || typeof walletAddress !== "string") {
             return NextResponse.json(
                 { error: "Invalid or missing walletAddress" },
@@ -16,56 +15,34 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        // Generate unique roomId
-        const roomId = uuidv4();
+        // 1. Create the session in memory. This returns a UUID.
+        const meetingId = createMeeting(walletAddress);
 
-        // Access environment variables securely on the server
-        const apiKey = process.env.LIVEKIT_API_KEY;
-        const apiSecret = process.env.LIVEKIT_API_SECRET;
-        const livekitUrl = process.env.LIVEKIT_URL;
+        // 2. Generate the LiveKit Token explicitly for the Host Role
+        const { token, livekitUrl } = await generateMeetingToken(
+            meetingId,
+            walletAddress,
+            displayName || "Host",
+            "host" // <-- Crucial Role Injection
+        );
 
-        if (!apiKey || !apiSecret || !livekitUrl) {
-            return NextResponse.json(
-                { error: "Server misconfiguration: Missing LiveKit credentials" },
-                { status: 500 }
-            );
-        }
+        // 3. Construct the Join URL
+        const protocol = req.headers.get("x-forwarded-proto") || "http";
+        const host = req.headers.get("host") || "localhost:3000";
+        const joinUrl = `${protocol}://${host}/app/room/${meetingId}`;
 
-        // Trigger Starknet testnet logic for USDC payment
-        const starknetTxHash = await handleRoomCreationPayment(roomId, walletAddress);
-
-        // Create LiveKit AccessToken
-        const token = new AccessToken(apiKey, apiSecret, {
-            identity: walletAddress,
-            name: displayName || "Host",
-            metadata: JSON.stringify({ isHost: true })
-        });
-
-        // Add room grant matching permissions request
-        token.addGrant({
-            roomJoin: true,
-            room: roomId,
-            canPublish: true,
-            canSubscribe: true,
-            roomAdmin: true,
-            canPublishData: true
-        });
-
-        // Generate JWT
-        const jwt = await token.toJwt();
-
-        // Return the required response including Starknet tx hash
         return NextResponse.json({
-            roomId,
-            token: jwt,
+            meetingId,
+            joinUrl,
+            token,
             livekitUrl,
-            starknetTxHash,
         });
     } catch (error: any) {
         console.error("Error creating room:", error);
         return NextResponse.json(
-            { error: error?.message || "Internal server error", stack: error?.stack },
+            { error: error?.message || "Internal server error" },
             { status: 500 }
         );
     }
 }
+
