@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
 
         // Generate the LiveKit Token explicitly for the Participant Role
         const { token, livekitUrl } = await generateMeetingToken(
-            roomId,
+            meeting.id,  // <-- CRITICAL: Use the normalized ID from the map, not the raw case-sensitive url param
             walletAddress,
             displayName || "Guest",
             "participant" // <-- Crucial Role Injection
