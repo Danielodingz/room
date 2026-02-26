@@ -10,6 +10,7 @@ import {
     useInjectedConnectors,
     voyager
 } from "@starknet-react/core";
+import { WebWalletConnector } from "starknetkit/webwallet";
 
 export function StarknetProvider({ children }: { children: React.ReactNode }) {
     const { connectors } = useInjectedConnectors({
@@ -24,11 +25,17 @@ export function StarknetProvider({ children }: { children: React.ReactNode }) {
         order: "random"
     });
 
+    // Combine Injected (Extensions) with the Web Wallet (Universal Fallback)
+    const allConnectors = [
+        ...connectors,
+        new WebWalletConnector({ url: "https://web.argent.xyz" })
+    ];
+
     return (
         <StarknetConfig
             chains={[sepolia]}
             provider={publicProvider()}
-            connectors={connectors}
+            connectors={allConnectors}
             explorer={voyager}
         >
             {children}

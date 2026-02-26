@@ -20,6 +20,7 @@
     "react": "^18",
     "react-dom": "^18",
     "starknet": "^8.9.2",
+    "starknetkit": "^3.4.3",
     "tailwind-merge": "^2.2.1",
     "uuid": "^13.0.0"
   },
