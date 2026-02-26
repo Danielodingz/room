@@ -58,10 +58,10 @@ export async function POST(req: NextRequest) {
             livekitUrl,
             starknetTxHash,
         });
-    } catch (error) {
+    } catch (error: any) {
         console.error("Error joining room:", error);
         return NextResponse.json(
-            { error: "Internal server error" },
+            { error: error?.message || "Internal server error", stack: error?.stack },
             { status: 500 }
         );
     }
