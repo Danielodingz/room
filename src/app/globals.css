@@ -1,0 +1,105 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #F5F5F5;
+  --foreground: #121212;
+  --brand-peach: #ff9d80;
+  --brand-purple: #c084fc;
+  --brand-orange: #fb923c;
+  --brand-green: #63FF33;
+}
+
+body {
+  color: var(--foreground);
+  background-color: var(--background);
+  overflow-x: hidden;
+}
+
+@layer base {
+  body {
+    @apply antialiased;
+  }
+}
+
+@layer components {
+  .mesh-gradient-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 697px;
+    z-index: -1;
+    overflow: hidden;
+    opacity: 0.8;
+  }
+
+  .mesh-gradient-mask {
+    position: absolute;
+    height: 697px;
+    left: -45px;
+    right: -106px;
+    top: -308px;
+    background: linear-gradient(180deg, #000000 41%, rgba(0, 0, 0, 0) 100%);
+    filter: blur(20px);
+  }
+
+  .section-container {
+    @apply max-w-[1512px] mx-auto px-6 md:px-[145px];
+    position: relative;
+  }
+
+  .heading-1 {
+    font-size: 65.8px;
+    line-height: 76px;
+    letter-spacing: -2.88px;
+    @apply font-bold text-[#121212] flex items-center;
+  }
+
+  .heading-2 {
+    font-size: 56px;
+    line-height: 63px;
+    letter-spacing: -2.4px;
+    @apply font-bold text-[#121212] flex items-center text-center justify-center;
+  }
+
+  .text-minor {
+    font-size: 18px;
+    line-height: 29px;
+    @apply font-normal text-[#545454] flex items-center;
+  }
+
+  .pill-button-primary {
+    @apply bg-[#121212] text-white font-bold flex items-center justify-center transition-all cursor-pointer;
+    padding: 12px 20px;
+    height: 49px;
+    border-radius: 12px;
+    font-size: 15.1px;
+    box-shadow: 0px 50px 30px -2.5px rgba(0, 0, 0, 0.13), inset 0px 0px 20px 1.64px rgba(255, 255, 255, 0.15);
+  }
+
+  .pill-button-secondary {
+    @apply bg-transparent text-[#121212] font-bold border border-[#D1D1D1] flex items-center justify-center transition-all cursor-pointer;
+    padding: 12px 20px;
+    height: 49px;
+    border-radius: 12px;
+    font-size: 14.9px;
+  }
+
+  .navbar-mesh-gradient {
+    position: absolute;
+    top: -150px;
+    left: 0;
+    right: 0;
+    height: 300px;
+    z-index: -1;
+    background:
+      radial-gradient(at 20% 50%, rgba(255, 157, 128, 0.4) 0px, transparent 50%),
+      radial-gradient(at 50% 40%, rgba(192, 132, 252, 0.5) 0px, transparent 50%),
+      radial-gradient(at 80% 50%, rgba(59, 130, 246, 0.4) 0px, transparent 50%);
+    filter: blur(60px);
+    opacity: 0.8;
+    pointer-events: none;
+  }
+}
