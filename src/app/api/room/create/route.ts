@@ -5,18 +5,18 @@ import { generateMeetingToken } from "@/lib/livekit";
 export async function POST(req: NextRequest) {
     try {
         const body = await req.json();
-        const { walletAddress, displayName } = body;
+        const { roomId, walletAddress, displayName } = body;
 
         // Validate walletAddress as it represents the Host's identity
-        if (!walletAddress || typeof walletAddress !== "string") {
+        if (!walletAddress || typeof walletAddress !== "string" || !roomId || typeof roomId !== "string") {
             return NextResponse.json(
-                { error: "Invalid or missing walletAddress" },
+                { error: "Invalid or missing walletAddress/roomId" },
                 { status: 400 }
             );
         }
 
-        // 1. Create the session in memory. This returns a UUID.
-        const meetingId = createMeeting(walletAddress);
+        // 1. Create the session in memory using the frontend's specific ID.
+        const meetingId = createMeeting(roomId, walletAddress);
 
         // 2. Generate the LiveKit Token explicitly for the Host Role
         const { token, livekitUrl } = await generateMeetingToken(

@@ -69,7 +69,7 @@ export default function MeetingRoomPage() {
                     const createRes = await fetch("/api/room/create", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ walletAddress: address, displayName }),
+                        body: JSON.stringify({ roomId: meetingId, walletAddress: address, displayName }),
                         signal: controller.signal
                     });
 

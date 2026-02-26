@@ -20,8 +20,7 @@ if (process.env.NODE_ENV !== 'production') {
     globalThis.__meetingsMap = meetings;
 }
 
-export function createMeeting(hostAddress: string): string {
-    const meetingId = uuidv4();
+export function createMeeting(meetingId: string, hostAddress: string): string {
     meetings.set(meetingId, {
         id: meetingId,
         host: hostAddress,
