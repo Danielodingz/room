@@ -37,6 +37,7 @@ export default function MeetingRoomPage() {
     const [token, setToken] = useState("");
     const [liveKitUrl, setLiveKitUrl] = useState("");
     const [isConnecting, setIsConnecting] = useState(false);
+    const [connectionError, setConnectionError] = useState("");
 
     // Pre-Join States
     const [preJoinComplete, setPreJoinComplete] = useState(false);
@@ -73,6 +74,9 @@ export default function MeetingRoomPage() {
                     setLiveKitUrl(data.livekitUrl);
                     clearTimeout(timeoutId);
                 } else {
+                    const joinErrorData = await res.text();
+                    console.error("Join API Failed:", res.status, joinErrorData);
+
                     // Try to create the room if it doesn't exist
                     const createRes = await fetch("/api/room/create", {
                         method: "POST",
@@ -85,11 +89,16 @@ export default function MeetingRoomPage() {
                         const data = await createRes.json();
                         setToken(data.token);
                         setLiveKitUrl(data.livekitUrl);
+                    } else {
+                        const createErrorData = await createRes.text();
+                        console.error("Create API Failed:", createRes.status, createErrorData);
+                        setConnectionError(`Host creation failed: ${createRes.status} - ${createErrorData}`);
                     }
                     clearTimeout(timeoutId);
                 }
-            } catch (error) {
+            } catch (error: any) {
                 console.error("Failed to connect:", error);
+                setConnectionError(error.message || "Network error occurred.");
             } finally {
                 setIsConnecting(false);
             }
@@ -129,9 +138,14 @@ export default function MeetingRoomPage() {
 
     if (!token || !liveKitUrl) {
         return (
-            <div className="flex flex-col h-screen bg-[#0A0A0B] items-center justify-center gap-4 text-gray-400 font-sans">
-                <span className="text-red-400">Failed to connect to the meeting.</span>
-                <button onClick={handleEndMeeting} className="px-4 py-2 bg-white/10 rounded-lg hover:bg-white/20 transition-colors text-white">Go Back</button>
+            <div className="flex flex-col h-screen bg-[#0A0A0B] items-center justify-center gap-4 text-gray-400 font-sans p-8 text-center">
+                <span className="text-red-400 text-xl font-bold">Failed to connect to the meeting.</span>
+                {connectionError && (
+                    <div className="bg-red-500/10 border border-red-500/20 text-red-400 p-4 rounded-xl text-sm max-w-xl break-words">
+                        {connectionError}
+                    </div>
+                )}
+                <button onClick={handleEndMeeting} className="px-6 py-3 mt-4 bg-white/10 rounded-xl hover:bg-white/20 transition-colors text-white font-bold">Go Back</button>
             </div>
         );
     }
