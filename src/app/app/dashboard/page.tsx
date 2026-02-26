@@ -50,12 +50,12 @@ export default function DashboardPage() {
     };
 
     const handleStartMeeting = () => {
-        router.push(`/app/room/${meetingId}`);
+        router.push(`/app/room/${meetingId}?mode=create`);
     };
 
     const handleJoinMeeting = () => {
         if (joinMeetingId.trim()) {
-            router.push(`/app/room/${joinMeetingId.trim()}`);
+            router.push(`/app/room/${joinMeetingId.trim()}?mode=join`);
         }
     };
 

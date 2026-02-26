@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import {
     Mic, MicOff, Video, VideoOff, Users, MessageSquare, Smile,
@@ -31,7 +31,9 @@ import PreJoinScreen from "@/components/PreJoinScreen";
 export default function MeetingRoomPage() {
     const params = useParams();
     const router = useRouter();
+    const searchParams = useSearchParams();
     const meetingId = params.id as string;
+    const mode = searchParams.get("mode");
     const { address, isConnected } = useAccount();
 
     const [token, setToken] = useState("");
@@ -60,24 +62,8 @@ export default function MeetingRoomPage() {
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), 15000);
 
-                // First try entering the room
-                const res = await fetch("/api/room/join", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ roomId: meetingId, walletAddress: address, displayName }),
-                    signal: controller.signal
-                });
-
-                if (res.ok) {
-                    const data = await res.json();
-                    setToken(data.token);
-                    setLiveKitUrl(data.livekitUrl);
-                    clearTimeout(timeoutId);
-                } else {
-                    const joinErrorData = await res.text();
-                    console.error("Join API Failed:", res.status, joinErrorData);
-
-                    // Try to create the room if it doesn't exist
+                if (mode === "create") {
+                    // Host Mode: Create the room
                     const createRes = await fetch("/api/room/create", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
@@ -93,6 +79,25 @@ export default function MeetingRoomPage() {
                         const createErrorData = await createRes.text();
                         console.error("Create API Failed:", createRes.status, createErrorData);
                         setConnectionError(`Host creation failed: ${createRes.status} - ${createErrorData}`);
+                    }
+                    clearTimeout(timeoutId);
+                } else {
+                    // Guest Mode (or direct URL link): Join the room
+                    const res = await fetch("/api/room/join", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ roomId: meetingId, walletAddress: address, displayName }),
+                        signal: controller.signal
+                    });
+
+                    if (res.ok) {
+                        const data = await res.json();
+                        setToken(data.token);
+                        setLiveKitUrl(data.livekitUrl);
+                    } else {
+                        const joinErrorData = await res.text();
+                        console.error("Join API Failed:", res.status, joinErrorData);
+                        setConnectionError(`Failed to join room: ${res.status} - ${joinErrorData}`);
                     }
                     clearTimeout(timeoutId);
                 }
