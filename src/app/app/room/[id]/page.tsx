@@ -42,10 +42,6 @@ export default function MeetingRoomPage() {
     const [isConnecting, setIsConnecting] = useState(false);
     const [connectionError, setConnectionError] = useState("");
 
-    // Explicit waiting room states
-    const [hasBeenAdmitted, setHasBeenAdmitted] = useState(false);
-    const [waitingGuests, setWaitingGuests] = useState<Array<{ identity: string, name: string }>>([]);
-
     // Pre-Join States
     const [preJoinComplete, setPreJoinComplete] = useState(false);
     const [displayName, setDisplayName] = useState("");
@@ -178,11 +174,6 @@ export default function MeetingRoomPage() {
                 displayName={displayName}
                 onLeave={handleEndMeeting}
                 isInitialHost={isHostMode}
-                hasBeenAdmitted={hasBeenAdmitted}
-                setHasBeenAdmitted={setHasBeenAdmitted}
-                waitingGuests={waitingGuests}
-                setWaitingGuests={setWaitingGuests}
-                onAdmittedToken={setToken}
             />
             <RoomAudioRenderer />
         </LiveKitRoom>
@@ -195,23 +186,13 @@ function RoomInterface({
     address,
     displayName,
     onLeave,
-    isInitialHost,
-    hasBeenAdmitted,
-    setHasBeenAdmitted,
-    waitingGuests,
-    setWaitingGuests,
-    onAdmittedToken
+    isInitialHost
 }: {
     meetingId: string,
     address?: string,
     displayName: string,
     onLeave: () => void,
-    isInitialHost: boolean,
-    hasBeenAdmitted: boolean,
-    setHasBeenAdmitted: (v: boolean) => void,
-    waitingGuests: Array<{ identity: string, name: string }>,
-    setWaitingGuests: React.Dispatch<React.SetStateAction<Array<{ identity: string, name: string }>>>,
-    onAdmittedToken: (newToken: string) => void
+    isInitialHost: boolean
 }) {
     const [currentTime, setCurrentTime] = useState(new Date());
     const [isHandRaised, setIsHandRaised] = useState(false);
@@ -230,99 +211,6 @@ function RoomInterface({
     const { send: sendHandUpdate, message: handMessage } = useDataChannel("hands");
     const connectionState = useConnectionState();
 
-    // Host & Waiting Room Logic
-    const isHost = localParticipant?.metadata ? JSON.parse(localParticipant.metadata).isHost : isInitialHost;
-
-    // Explicitly lock down the guest if they aren't admitted yet
-    const isInWaitingRoom = connectionState === ConnectionState.Connected && !isHost && !hasBeenAdmitted;
-
-    // Robust Server-Side Polling for Waitlist
-    // DataChannels are often blocked by corporate firewalls/VPNs. Polling the LiveKit API directly ensures 100% sync.
-    useEffect(() => {
-        if (!isHost || connectionState !== ConnectionState.Connected) return;
-
-        const checkWaitlist = async () => {
-            try {
-                const res = await fetch(`/api/room/waitlist?roomId=${meetingId}`);
-                if (res.ok) {
-                    const data = await res.json();
-                    if (data.waitingGuests) {
-                        setWaitingGuests(data.waitingGuests);
-                    }
-                }
-            } catch (err) {
-                console.error("Failed to poll waitlist", err);
-            }
-        };
-
-        checkWaitlist(); // Initial check
-        const interval = setInterval(checkWaitlist, 3000);
-        return () => clearInterval(interval);
-    }, [isHost, connectionState, meetingId, setWaitingGuests]);
-
-    // Guest Polling to check if Host has admitted them
-    useEffect(() => {
-        if (!isInWaitingRoom || isHost) return;
-
-        const checkAdmissionStatus = async () => {
-            try {
-                const res = await fetch(`/api/room/waitlist/status?roomId=${meetingId}&identity=${localParticipant.identity}`);
-                if (res.ok) {
-                    const data = await res.json();
-                    if (data.admitted) {
-                        // The server says we're admitted! Acquire the new token.
-                        fetch("/api/room/admit", {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({
-                                roomId: meetingId,
-                                walletAddress: localParticipant.identity,
-                                displayName: localParticipant.name
-                            })
-                        })
-                            .then(res => res.json())
-                            .then(data => {
-                                if (data.token) {
-                                    onAdmittedToken(data.token);
-                                    setHasBeenAdmitted(true);
-
-                                    // Force hardware engagement
-                                    setTimeout(() => {
-                                        try {
-                                            localParticipant.setCameraEnabled(true);
-                                            localParticipant.setMicrophoneEnabled(true);
-                                        } catch (err) {
-                                            console.error("Failed to enable tracks after admit", err);
-                                        }
-                                    }, 500);
-                                }
-                            })
-                            .catch(err => console.error("Failed to upgrade token:", err));
-                    }
-                }
-            } catch (err) {
-                console.error("Failed to check admission status", err);
-            }
-        };
-
-        const interval = setInterval(checkAdmissionStatus, 3000);
-        return () => clearInterval(interval);
-    }, [isInWaitingRoom, isHost, meetingId, localParticipant, onAdmittedToken, setHasBeenAdmitted]);
-
-    const handleAdmitGuest = async (guestIdentity: string) => {
-        // Optimistically remove from UI
-        setWaitingGuests(prev => prev.filter(g => g.identity !== guestIdentity));
-
-        try {
-            await fetch("/api/room/waitlist/status", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ roomId: meetingId, identity: guestIdentity, action: "admit" })
-            });
-        } catch (err) {
-            console.error("Failed to dispatch admit command", err);
-        }
-    };
 
     // LiveKit Track Hooks for rendering grid layout
     const tracks = useTracks(
@@ -404,25 +292,7 @@ function RoomInterface({
     const toggleVideo = () => localParticipant.setCameraEnabled(!isCameraEnabled);
     const toggleScreenShare = () => localParticipant.setScreenShareEnabled(!isScreenShareEnabled);
 
-    // --- RENDER WAITING ROOM IF NOT ADMITTED ---
-    if (isInWaitingRoom) {
-        return (
-            <div className="flex flex-col h-screen bg-[#0A0A0B] items-center justify-center gap-4 text-gray-400 font-sans p-8 text-center relative w-full overflow-hidden">
-                <div className="absolute inset-0 bg-blue-500/5 backdrop-blur-3xl z-0" />
-                <div className="z-10 flex flex-col items-center">
-                    <Loader2 size={48} className="animate-spin text-blue-500 mb-6" />
-                    <h2 className="text-3xl font-bold text-white mb-3">Please wait</h2>
-                    <p className="max-w-md text-lg text-gray-400">The meeting host will let you in soon.</p>
-                    <button
-                        onClick={onLeave}
-                        className="px-8 py-3 mt-10 bg-red-500/10 border border-red-500/20 rounded-xl hover:bg-red-500/20 hover:border-red-500/50 transition-all text-red-400 font-bold"
-                    >
-                        Leave Waiting Room
-                    </button>
-                </div>
-            </div>
-        );
-    }
+
 
     return (
         <div className="flex flex-col flex-1 relative overflow-hidden">
@@ -436,7 +306,6 @@ function RoomInterface({
                     <div className="ml-2 flex items-center gap-1.5">
                         <div className="w-1.5 h-1.5 bg-green-500 rounded-full" />
                         <ShieldCheck size={14} className="text-green-500" />
-                        {isHost && <span className="text-[10px] font-bold text-green-500 uppercase tracking-widest bg-green-500/20 px-1.5 py-0.5 rounded">Host</span>}
                     </div>
                 </div>
 
@@ -473,222 +342,179 @@ function RoomInterface({
                 </div>
             )}
 
-            {/* Host Controls Overlay */}
-            {isHost && (
-                <div className="absolute top-20 right-6 z-20 flex flex-col gap-2">
-                    <div className="bg-black/40 backdrop-blur-md border border-white/10 px-4 py-3 rounded-xl shadow-2xl flex flex-col gap-2 min-w-[200px] max-w-[280px]">
-                        <span className="text-[11px] font-bold text-gray-400 uppercase tracking-widest border-b border-white/5 pb-2">Waiting Room</span>
-                        {waitingGuests.length === 0 ? (
-                            <span className="text-xs text-gray-500 italic py-1">No guests waiting.</span>
-                        ) : (
-                            <div className="flex flex-col gap-2 mt-1">
-                                {waitingGuests.map(guest => (
-                                    <div key={guest.identity} className="flex flex-col gap-1 bg-white/5 p-2 rounded-lg border border-white/5">
-                                        <span className="text-sm font-bold text-gray-200">{guest.name}</span>
-                                        <div className="flex gap-2">
-                                            <button
-                                                onClick={() => handleAdmitGuest(guest.identity)}
-                                                className="bg-green-500/20 hover:bg-green-500/30 text-green-400 text-[10px] font-bold py-1 px-2 rounded-md transition-colors w-full uppercase tracking-wider"
-                                            >
-                                                Admit
-                                            </button>
-                                        </div>
+
+
+            {/* Main Layout: Video Area + Chat Sidebar */}
+            <div className="flex flex-1 relative overflow-hidden">
+                {/* Video Grid Area */}
+                <div className="flex-1 flex flex-col relative bg-[#0F0F10] transition-all duration-300">
+                    <div className="w-full h-full p-4 pt-20 pb-4 relative flex">
+                        {tracks.length > 0 ? (
+                            hasScreenShare ? (
+                                <FocusLayoutContainer className="w-full h-full flex flex-col md:flex-row gap-4">
+                                    <div className="flex-1 h-full min-h-[60%]">
+                                        <FocusLayout trackRef={screenShareTracks[0]} />
                                     </div>
-                                ))}
+                                    <div className="md:w-[240px] md:h-full h-[120px] w-full shrink-0">
+                                        <CarouselLayout tracks={tracks as TrackReferenceOrPlaceholder[]}>
+                                            <ParticipantTile />
+                                        </CarouselLayout>
+                                    </div>
+                                </FocusLayoutContainer>
+                            ) : (
+                                <GridLayout tracks={tracks as TrackReferenceOrPlaceholder[]} style={{ height: '100%', width: '100%' }}>
+                                    <ParticipantTile />
+                                </GridLayout>
+                            )
+                        ) : (
+                            <div className="w-full h-full flex flex-col items-center justify-center text-gray-500 gap-4">
+                                <span className="text-[14px] font-medium animate-pulse">Waiting for media streams...</span>
                             </div>
                         )}
                     </div>
                 </div>
-            )}
 
-            {/* Main Layout: Video Area + Chat Sidebar */}
-            <div className="flex flex-1 relative overflow-hidden">
-                {isInWaitingRoom ? (
-                    <div className="flex-1 flex flex-col items-center justify-center bg-[#0F0F10] relative z-40 gap-6">
-                        <div className="w-24 h-24 rounded-full bg-blue-500/10 flex items-center justify-center animate-pulse border border-blue-500/20">
-                            <Users size={40} className="text-blue-500" />
-                        </div>
-                        <div className="text-center flex flex-col gap-2">
-                            <h2 className="text-2xl font-bold">Please wait</h2>
-                            <p className="text-gray-400">The meeting host will let you in soon.</p>
-                        </div>
-                        <button onClick={onLeave} className="px-6 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-white font-bold transition-all border border-white/10 mt-4">
-                            Leave
-                        </button>
-                    </div>
-                ) : (
-                    <>
-                        {/* Video Grid Area */}
-                        <div className="flex-1 flex flex-col relative bg-[#0F0F10] transition-all duration-300">
-                            <div className="w-full h-full p-4 pt-20 pb-4 relative flex">
-                                {tracks.length > 0 ? (
-                                    hasScreenShare ? (
-                                        <FocusLayoutContainer className="w-full h-full flex flex-col md:flex-row gap-4">
-                                            <div className="flex-1 h-full min-h-[60%]">
-                                                <FocusLayout trackRef={screenShareTracks[0]} />
-                                            </div>
-                                            <div className="md:w-[240px] md:h-full h-[120px] w-full shrink-0">
-                                                <CarouselLayout tracks={tracks as TrackReferenceOrPlaceholder[]}>
-                                                    <ParticipantTile />
-                                                </CarouselLayout>
-                                            </div>
-                                        </FocusLayoutContainer>
-                                    ) : (
-                                        <GridLayout tracks={tracks as TrackReferenceOrPlaceholder[]} style={{ height: '100%', width: '100%' }}>
-                                            <ParticipantTile />
-                                        </GridLayout>
-                                    )
-                                ) : (
-                                    <div className="w-full h-full flex flex-col items-center justify-center text-gray-500 gap-4">
-                                        <span className="text-[14px] font-medium animate-pulse">Waiting for media streams...</span>
-                                    </div>
-                                )}
+                {/* Right Chat Sidebar */}
+                {isChatOpen && (
+                    <div className="w-[380px] bg-[#111112] border-l border-white/5 flex flex-col animate-in slide-in-from-right duration-300 shadow-2xl relative z-30">
+                        <div className="p-6 flex items-center justify-between border-b border-white/5">
+                            <h2 className="text-[18px] font-bold tracking-tight">Meeting Chat</h2>
+                            <div className="flex items-center gap-2">
+                                <button className="p-2 hover:bg-white/5 rounded-lg text-gray-400"><Maximize2 size={16} /></button>
+                                <button onClick={() => setIsChatOpen(false)} className="p-2 hover:bg-white/5 rounded-lg text-gray-400"><X size={18} /></button>
                             </div>
                         </div>
 
-                        {/* Right Chat Sidebar */}
-                        {isChatOpen && (
-                            <div className="w-[380px] bg-[#111112] border-l border-white/5 flex flex-col animate-in slide-in-from-right duration-300 shadow-2xl relative z-30">
-                                <div className="p-6 flex items-center justify-between border-b border-white/5">
-                                    <h2 className="text-[18px] font-bold tracking-tight">Meeting Chat</h2>
-                                    <div className="flex items-center gap-2">
-                                        <button className="p-2 hover:bg-white/5 rounded-lg text-gray-400"><Maximize2 size={16} /></button>
-                                        <button onClick={() => setIsChatOpen(false)} className="p-2 hover:bg-white/5 rounded-lg text-gray-400"><X size={18} /></button>
+                        <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-4 custom-scrollbar relative">
+                            {chatMessages.length === 0 ? (
+                                <div className="flex flex-col items-center justify-center py-10 opacity-40 mt-10">
+                                    <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mb-4">
+                                        <MessageCircle size={24} />
                                     </div>
+                                    <span className="text-[14px] font-medium text-center max-w-[200px]">Send a message to start the conversation</span>
                                 </div>
-
-                                <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-4 custom-scrollbar relative">
-                                    {chatMessages.length === 0 ? (
-                                        <div className="flex flex-col items-center justify-center py-10 opacity-40 mt-10">
-                                            <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mb-4">
-                                                <MessageCircle size={24} />
-                                            </div>
-                                            <span className="text-[14px] font-medium text-center max-w-[200px]">Send a message to start the conversation</span>
+                            ) : (
+                                chatMessages.map((msg: any) => (
+                                    <div key={msg.id} className="flex flex-col gap-1">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-[12px] font-bold text-gray-400">{msg.from?.name || msg.from?.identity || "Unknown"}</span>
+                                            <span className="text-[10px] text-gray-600">{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                                         </div>
-                                    ) : (
-                                        chatMessages.map((msg: any) => (
-                                            <div key={msg.id} className="flex flex-col gap-1">
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-[12px] font-bold text-gray-400">{msg.from?.name || msg.from?.identity || "Unknown"}</span>
-                                                    <span className="text-[10px] text-gray-600">{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                                                </div>
-                                                <div className="bg-white/5 p-3 rounded-xl text-[14px] text-gray-200 w-fit max-w-full break-words">
-                                                    {msg.message}
-                                                </div>
-                                            </div>
-                                        ))
-                                    )}
+                                        <div className="bg-white/5 p-3 rounded-xl text-[14px] text-gray-200 w-fit max-w-full break-words">
+                                            {msg.message}
+                                        </div>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+
+                        {/* Input Area */}
+                        <div className="p-6 border-t border-white/5 bg-[#111112] relative">
+                            {/* Emoji Picker Popup */}
+                            {isEmojiPickerOpen && (
+                                <div className="absolute bottom-[100%] right-6 mb-2 bg-[#1C1C1E] border border-white/10 rounded-2xl p-4 flex gap-3 shadow-2xl z-50 animate-in fade-in zoom-in-95">
+                                    {['👍', '👏', '❤️', '😂', '🎉', '😮'].map(emoji => (
+                                        <button
+                                            key={emoji}
+                                            onClick={() => handleSendReaction(emoji)}
+                                            className="text-2xl hover:bg-white/10 hover:scale-125 transition-all p-2 rounded-xl"
+                                        >
+                                            {emoji}
+                                        </button>
+                                    ))}
                                 </div>
+                            )}
 
-                                {/* Input Area */}
-                                <div className="p-6 border-t border-white/5 bg-[#111112] relative">
-                                    {/* Emoji Picker Popup */}
-                                    {isEmojiPickerOpen && (
-                                        <div className="absolute bottom-[100%] right-6 mb-2 bg-[#1C1C1E] border border-white/10 rounded-2xl p-4 flex gap-3 shadow-2xl z-50 animate-in fade-in zoom-in-95">
-                                            {['👍', '👏', '❤️', '😂', '🎉', '😮'].map(emoji => (
-                                                <button
-                                                    key={emoji}
-                                                    onClick={() => handleSendReaction(emoji)}
-                                                    className="text-2xl hover:bg-white/10 hover:scale-125 transition-all p-2 rounded-xl"
-                                                >
-                                                    {emoji}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    )}
+                            <div className="flex items-center gap-2 mb-3 px-1">
+                                <span className="text-[12px] font-bold text-gray-500 uppercase tracking-widest">To:</span>
+                                <button className="flex items-center gap-1.5 px-3 py-1 bg-blue-500/10 border border-blue-500/20 rounded-lg text-blue-400 text-[12px] font-bold">
+                                    Everyone
+                                    <ChevronUp size={12} />
+                                </button>
+                            </div>
 
-                                    <div className="flex items-center gap-2 mb-3 px-1">
-                                        <span className="text-[12px] font-bold text-gray-500 uppercase tracking-widest">To:</span>
-                                        <button className="flex items-center gap-1.5 px-3 py-1 bg-blue-500/10 border border-blue-500/20 rounded-lg text-blue-400 text-[12px] font-bold">
-                                            Everyone
-                                            <ChevronUp size={12} />
+                            <div className="bg-white/5 border border-white/10 rounded-2xl p-4 focus-within:border-blue-500/50 transition-all flex flex-col gap-4">
+                                <textarea
+                                    value={chatInput}
+                                    onChange={(e) => setChatInput(e.target.value)}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter' && !e.shiftKey) {
+                                            e.preventDefault();
+                                            handleSendMessage();
+                                        }
+                                    }}
+                                    placeholder="Type message here ..."
+                                    className="bg-transparent border-none outline-none resize-none w-full text-[14px] text-gray-200 placeholder:text-gray-600 min-h-[40px] max-h-[120px] custom-scrollbar"
+                                />
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-1">
+                                        <button className="p-2 hover:bg-white/5 rounded-lg text-gray-400"><Paperclip size={18} /></button>
+                                        <button className="p-2 hover:bg-white/5 rounded-lg text-gray-400"><SmilePlus size={18} /></button>
+                                        <button
+                                            onClick={() => setIsGiftingOpen(!isGiftingOpen)}
+                                            className={`p-2 rounded-lg transition-all ${isGiftingOpen ? 'bg-yellow-500/20 text-yellow-500' : 'hover:bg-white/5 text-gray-400 hover:text-yellow-500'}`}
+                                        >
+                                            <Gift size={18} />
                                         </button>
                                     </div>
-
-                                    <div className="bg-white/5 border border-white/10 rounded-2xl p-4 focus-within:border-blue-500/50 transition-all flex flex-col gap-4">
-                                        <textarea
-                                            value={chatInput}
-                                            onChange={(e) => setChatInput(e.target.value)}
-                                            onKeyDown={(e) => {
-                                                if (e.key === 'Enter' && !e.shiftKey) {
-                                                    e.preventDefault();
-                                                    handleSendMessage();
-                                                }
-                                            }}
-                                            placeholder="Type message here ..."
-                                            className="bg-transparent border-none outline-none resize-none w-full text-[14px] text-gray-200 placeholder:text-gray-600 min-h-[40px] max-h-[120px] custom-scrollbar"
-                                        />
-                                        <div className="flex items-center justify-between">
-                                            <div className="flex items-center gap-1">
-                                                <button className="p-2 hover:bg-white/5 rounded-lg text-gray-400"><Paperclip size={18} /></button>
-                                                <button className="p-2 hover:bg-white/5 rounded-lg text-gray-400"><SmilePlus size={18} /></button>
-                                                <button
-                                                    onClick={() => setIsGiftingOpen(!isGiftingOpen)}
-                                                    className={`p-2 rounded-lg transition-all ${isGiftingOpen ? 'bg-yellow-500/20 text-yellow-500' : 'hover:bg-white/5 text-gray-400 hover:text-yellow-500'}`}
-                                                >
-                                                    <Gift size={18} />
-                                                </button>
-                                            </div>
-                                            <button
-                                                onClick={handleSendMessage}
-                                                disabled={!chatInput.trim() || isSending}
-                                                className="p-2.5 bg-blue-500/10 text-blue-400 rounded-xl hover:bg-blue-500/20 transition-all disabled:opacity-50 active:scale-95"
-                                            >
-                                                <Send size={18} />
-                                            </button>
-                                        </div>
-                                    </div>
-
-                                    {/* Gifting Selection Area */}
-                                    {isGiftingOpen && (
-                                        <div className="mt-4 bg-yellow-500/5 border border-yellow-500/20 rounded-2xl p-4 animate-in slide-in-from-bottom-2 duration-300">
-                                            <div className="flex items-center justify-between mb-4">
-                                                <div className="flex items-center gap-2">
-                                                    <div className="w-6 h-6 bg-yellow-500 rounded-full flex items-center justify-center">
-                                                        <Coins size={14} className="text-black" />
-                                                    </div>
-                                                    <span className="text-[12px] font-bold text-yellow-500 uppercase tracking-widest">Send Coins</span>
-                                                </div>
-                                                <button onClick={() => setIsGiftingOpen(false)} className="text-gray-500 hover:text-white"><X size={14} /></button>
-                                            </div>
-
-                                            <div className="grid grid-cols-4 gap-2 mb-4">
-                                                {[5, 10, 20, 50].map((amount) => (
-                                                    <button
-                                                        key={amount}
-                                                        onClick={() => setGiftAmount(amount)}
-                                                        className={`py-2 rounded-xl text-[12px] font-bold transition-all border ${giftAmount === amount
-                                                            ? 'bg-yellow-500 text-black border-yellow-500'
-                                                            : 'bg-white/5 text-gray-400 border-white/10 hover:border-yellow-500/50'
-                                                            }`}
-                                                    >
-                                                        {amount}
-                                                    </button>
-                                                ))}
-                                            </div>
-
-                                            <button
-                                                onClick={() => setIsGiftingOpen(false)}
-                                                className="w-full bg-yellow-500 hover:bg-yellow-600 text-black font-black py-2.5 rounded-xl text-[13px] transition-all shadow-lg shadow-yellow-500/20 active:scale-95"
-                                            >
-                                                Send {giftAmount} Coins
-                                            </button>
-                                        </div>
-                                    )}
-
-                                    <div className="mt-2 flex items-center justify-center gap-2 py-1">
-                                        <Users size={12} className="text-gray-600" />
-                                        <span className="text-[11px] font-bold text-gray-600">Who can see your messages?</span>
-                                    </div>
+                                    <button
+                                        onClick={handleSendMessage}
+                                        disabled={!chatInput.trim() || isSending}
+                                        className="p-2.5 bg-blue-500/10 text-blue-400 rounded-xl hover:bg-blue-500/20 transition-all disabled:opacity-50 active:scale-95"
+                                    >
+                                        <Send size={18} />
+                                    </button>
                                 </div>
                             </div>
-                        )}
-                    </>
+
+                            {/* Gifting Selection Area */}
+                            {isGiftingOpen && (
+                                <div className="mt-4 bg-yellow-500/5 border border-yellow-500/20 rounded-2xl p-4 animate-in slide-in-from-bottom-2 duration-300">
+                                    <div className="flex items-center justify-between mb-4">
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-6 h-6 bg-yellow-500 rounded-full flex items-center justify-center">
+                                                <Coins size={14} className="text-black" />
+                                            </div>
+                                            <span className="text-[12px] font-bold text-yellow-500 uppercase tracking-widest">Send Coins</span>
+                                        </div>
+                                        <button onClick={() => setIsGiftingOpen(false)} className="text-gray-500 hover:text-white"><X size={14} /></button>
+                                    </div>
+
+                                    <div className="grid grid-cols-4 gap-2 mb-4">
+                                        {[5, 10, 20, 50].map((amount) => (
+                                            <button
+                                                key={amount}
+                                                onClick={() => setGiftAmount(amount)}
+                                                className={`py-2 rounded-xl text-[12px] font-bold transition-all border ${giftAmount === amount
+                                                    ? 'bg-yellow-500 text-black border-yellow-500'
+                                                    : 'bg-white/5 text-gray-400 border-white/10 hover:border-yellow-500/50'
+                                                    }`}
+                                            >
+                                                {amount}
+                                            </button>
+                                        ))}
+                                    </div>
+
+                                    <button
+                                        onClick={() => setIsGiftingOpen(false)}
+                                        className="w-full bg-yellow-500 hover:bg-yellow-600 text-black font-black py-2.5 rounded-xl text-[13px] transition-all shadow-lg shadow-yellow-500/20 active:scale-95"
+                                    >
+                                        Send {giftAmount} Coins
+                                    </button>
+                                </div>
+                            )}
+
+                            <div className="mt-2 flex items-center justify-center gap-2 py-1">
+                                <Users size={12} className="text-gray-600" />
+                                <span className="text-[11px] font-bold text-gray-600">Who can see your messages?</span>
+                            </div>
+                        </div>
+                    </div>
                 )}
             </div>
 
             {/* Bottom Toolbar Controls */}
-            <div className={`h-[96px] bg-[#0A0A0B]/80 backdrop-blur-xl border-t border-white/5 px-8 flex items-center justify-between z-40 relative shadow-[0_-20px_40px_-5px_rgba(0,0,0,0.4)] ${isInWaitingRoom ? 'opacity-50 pointer-events-none' : ''}`}>
+            <div className="h-[96px] bg-[#0A0A0B]/80 backdrop-blur-xl border-t border-white/5 px-8 flex items-center justify-between z-40 relative shadow-[0_-20px_40px_-5px_rgba(0,0,0,0.4)]">
                 {/* Left: Meeting Settings */}
                 <div className="flex items-center gap-2 min-w-[120px]">
                     <div className="flex flex-col group p-1">
@@ -755,7 +581,7 @@ function RoomInterface({
                     </button>
                 </div>
             </div>
-        </div>
+        </div >
     );
 }
 

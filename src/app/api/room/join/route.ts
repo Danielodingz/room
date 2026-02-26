@@ -1,8 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { AccessToken } from "livekit-server-sdk";
-import { handleRoomJoinPayment } from "@/lib/starknet";
-
-export async function POST(req: NextRequest) {
+import { AccessToken } from "livekit-server-sdk"; export async function POST(req: NextRequest) {
     try {
         const body = await req.json();
         const { roomId, walletAddress, displayName } = body;
@@ -30,9 +27,6 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        // Trigger Starknet testnet logic for USDC payment
-        const starknetTxHash = await handleRoomJoinPayment(roomId, walletAddress);
-
         // Create LiveKit AccessToken
         const token = new AccessToken(apiKey, apiSecret, {
             identity: walletAddress,
@@ -44,9 +38,9 @@ export async function POST(req: NextRequest) {
         token.addGrant({
             roomJoin: true,
             room: roomId,
-            canPublish: false, // Disables A/V publishing until admitted
+            canPublish: true, // Allow direct A/V publishing
             canSubscribe: true,
-            canPublishData: true // REQUIRED: Allows them to ping the host via DataChannel that they are waiting
+            canPublishData: true
         });
 
         // Generate JWT
@@ -56,7 +50,6 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({
             token: jwt,
             livekitUrl,
-            starknetTxHash,
         });
     } catch (error: any) {
         console.error("Error joining room:", error);
