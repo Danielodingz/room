@@ -23,9 +23,10 @@ import {
     useConnectionState,
     useLocalParticipant,
     useChat,
-    useDataChannel
+    useDataChannel,
+    useRoomContext
 } from "@livekit/components-react";
-import { Track, ConnectionState, Participant } from "livekit-client";
+import { Track, ConnectionState, Participant, LocalParticipant } from "livekit-client";
 import PreJoinScreen from "@/components/PreJoinScreen";
 
 export default function MeetingRoomPage() {
@@ -40,6 +41,10 @@ export default function MeetingRoomPage() {
     const [liveKitUrl, setLiveKitUrl] = useState("");
     const [isConnecting, setIsConnecting] = useState(false);
     const [connectionError, setConnectionError] = useState("");
+
+    // Explicit waiting room states
+    const [hasBeenAdmitted, setHasBeenAdmitted] = useState(false);
+    const [waitingGuests, setWaitingGuests] = useState<Array<{ identity: string, name: string }>>([]);
 
     // Pre-Join States
     const [preJoinComplete, setPreJoinComplete] = useState(false);
@@ -155,6 +160,9 @@ export default function MeetingRoomPage() {
         );
     }
 
+    // Determine initial role for render optimization
+    const isHostMode = mode === "create";
+
     return (
         <LiveKitRoom
             video={initialVideoEnabled}
@@ -164,13 +172,44 @@ export default function MeetingRoomPage() {
             data-lk-theme="default"
             className="flex flex-col h-screen bg-[#0A0A0B] text-white font-sans overflow-hidden"
         >
-            <RoomInterface meetingId={meetingId} address={address} displayName={displayName} onLeave={handleEndMeeting} />
+            <RoomInterface
+                meetingId={meetingId}
+                address={address}
+                displayName={displayName}
+                onLeave={handleEndMeeting}
+                isInitialHost={isHostMode}
+                hasBeenAdmitted={hasBeenAdmitted}
+                setHasBeenAdmitted={setHasBeenAdmitted}
+                waitingGuests={waitingGuests}
+                setWaitingGuests={setWaitingGuests}
+            />
             <RoomAudioRenderer />
         </LiveKitRoom>
     );
 }
 
-function RoomInterface({ meetingId, address, displayName, onLeave }: { meetingId: string, address?: string, displayName: string, onLeave: () => void }) {
+// Extracted internal UI component to safely use LiveKit hooks inside the Room Context
+function RoomInterface({
+    meetingId,
+    address,
+    displayName,
+    onLeave,
+    isInitialHost,
+    hasBeenAdmitted,
+    setHasBeenAdmitted,
+    waitingGuests,
+    setWaitingGuests
+}: {
+    meetingId: string,
+    address?: string,
+    displayName: string,
+    onLeave: () => void,
+    isInitialHost: boolean,
+    hasBeenAdmitted: boolean,
+    setHasBeenAdmitted: (v: boolean) => void,
+    waitingGuests: Array<{ identity: string, name: string }>,
+    setWaitingGuests: React.Dispatch<React.SetStateAction<Array<{ identity: string, name: string }>>>
+}) {
     const [currentTime, setCurrentTime] = useState(new Date());
     const [isHandRaised, setIsHandRaised] = useState(false);
     const [raisedHands, setRaisedHands] = useState<string[]>([]);
@@ -186,12 +225,58 @@ function RoomInterface({ meetingId, address, displayName, onLeave }: { meetingId
     const { send: sendChatMessage, chatMessages, isSending } = useChat();
     const { send: sendReactionData, message: incomingReaction } = useDataChannel("reactions");
     const { send: sendHandUpdate, message: handMessage } = useDataChannel("hands");
+    const { send: sendWaitingRoomAuth, message: waitingRoomMsg } = useDataChannel("waiting-room");
     const connectionState = useConnectionState();
 
     // Host & Waiting Room Logic
-    const isHost = localParticipant?.metadata ? JSON.parse(localParticipant.metadata).isHost : false;
-    const canPublish = localParticipant?.permissions?.canPublish !== false;
-    const isInWaitingRoom = connectionState === ConnectionState.Connected && !isHost && !canPublish;
+    const isHost = localParticipant?.metadata ? JSON.parse(localParticipant.metadata).isHost : isInitialHost;
+
+    // Explicitly lock down the guest if they aren't admitted yet
+    const isInWaitingRoom = connectionState === ConnectionState.Connected && !isHost && !hasBeenAdmitted;
+
+    // Process specialized data channel messages for the Waitlist flow
+    useEffect(() => {
+        if (!waitingRoomMsg) return;
+
+        try {
+            const data = JSON.parse(new TextDecoder().decode(waitingRoomMsg.payload));
+
+            if (isHost && data.type === 'guest_waiting') {
+                setWaitingGuests((prev: Array<{ identity: string, name: string }>) => {
+                    if (prev.find((g: any) => g.identity === data.identity)) return prev;
+                    return [...prev, { identity: data.identity, name: data.name }];
+                });
+            }
+
+            if (!isHost && data.type === 'admit_guest' && data.targetIdentity === localParticipant.identity) {
+                setHasBeenAdmitted(true);
+            }
+        } catch (e) {
+            console.error(e);
+        }
+    }, [waitingRoomMsg, isHost, localParticipant.identity, setWaitingGuests, setHasBeenAdmitted]);
+
+    // Continuously broadcast presence to the host if stuck in the waiting room
+    useEffect(() => {
+        if (isInWaitingRoom && connectionState === ConnectionState.Connected) {
+            const interval = setInterval(() => {
+                const msg = JSON.stringify({
+                    type: 'guest_waiting',
+                    identity: localParticipant.identity,
+                    name: localParticipant.name || "Guest"
+                });
+                sendWaitingRoomAuth(new TextEncoder().encode(msg), { reliable: true });
+            }, 3000);
+            return () => clearInterval(interval);
+        }
+    }, [isInWaitingRoom, connectionState, localParticipant, sendWaitingRoomAuth]);
+
+    const handleAdmitGuest = (guestIdentity: string) => {
+        const msg = JSON.stringify({ type: 'admit_guest', targetIdentity: guestIdentity });
+        sendWaitingRoomAuth(new TextEncoder().encode(msg), { reliable: true });
+        // Remove from local waiting list
+        setWaitingGuests((prev: Array<{ identity: string, name: string }>) => prev.filter((g: any) => g.identity !== guestIdentity));
+    };
 
     // LiveKit Track Hooks for rendering grid layout
     const tracks = useTracks(
@@ -273,7 +358,25 @@ function RoomInterface({ meetingId, address, displayName, onLeave }: { meetingId
     const toggleVideo = () => localParticipant.setCameraEnabled(!isCameraEnabled);
     const toggleScreenShare = () => localParticipant.setScreenShareEnabled(!isScreenShareEnabled);
 
-
+    // --- RENDER WAITING ROOM IF NOT ADMITTED ---
+    if (isInWaitingRoom) {
+        return (
+            <div className="flex flex-col h-screen bg-[#0A0A0B] items-center justify-center gap-4 text-gray-400 font-sans p-8 text-center relative w-full overflow-hidden">
+                <div className="absolute inset-0 bg-blue-500/5 backdrop-blur-3xl z-0" />
+                <div className="z-10 flex flex-col items-center">
+                    <Loader2 size={48} className="animate-spin text-blue-500 mb-6" />
+                    <h2 className="text-3xl font-bold text-white mb-3">Please wait</h2>
+                    <p className="max-w-md text-lg text-gray-400">The meeting host will let you in soon.</p>
+                    <button
+                        onClick={onLeave}
+                        className="px-8 py-3 mt-10 bg-red-500/10 border border-red-500/20 rounded-xl hover:bg-red-500/20 hover:border-red-500/50 transition-all text-red-400 font-bold"
+                    >
+                        Leave Waiting Room
+                    </button>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="flex flex-col flex-1 relative overflow-hidden">
@@ -327,14 +430,27 @@ function RoomInterface({ meetingId, address, displayName, onLeave }: { meetingId
             {/* Host Controls Overlay */}
             {isHost && (
                 <div className="absolute top-20 right-6 z-20 flex flex-col gap-2">
-                    <div className="bg-black/40 backdrop-blur-md border border-white/10 px-4 py-3 rounded-xl shadow-2xl flex flex-col gap-2 max-w-[200px]">
-                        <span className="text-[11px] font-bold text-gray-400 uppercase tracking-widest border-b border-white/5 pb-2">Host Controls</span>
-                        <button
-                            className="bg-green-500/20 hover:bg-green-500/30 text-green-400 text-[12px] font-bold py-1.5 rounded-lg transition-colors w-full"
-                            onClick={() => alert("Mock feature: In a full integration, this would trigger a server-side webhook to elevate a waiting participant's publish permissions.")}
-                        >
-                            Admit Waiting Users
-                        </button>
+                    <div className="bg-black/40 backdrop-blur-md border border-white/10 px-4 py-3 rounded-xl shadow-2xl flex flex-col gap-2 min-w-[200px] max-w-[280px]">
+                        <span className="text-[11px] font-bold text-gray-400 uppercase tracking-widest border-b border-white/5 pb-2">Waiting Room</span>
+                        {waitingGuests.length === 0 ? (
+                            <span className="text-xs text-gray-500 italic py-1">No guests waiting.</span>
+                        ) : (
+                            <div className="flex flex-col gap-2 mt-1">
+                                {waitingGuests.map(guest => (
+                                    <div key={guest.identity} className="flex flex-col gap-1 bg-white/5 p-2 rounded-lg border border-white/5">
+                                        <span className="text-sm font-bold text-gray-200">{guest.name}</span>
+                                        <div className="flex gap-2">
+                                            <button
+                                                onClick={() => handleAdmitGuest(guest.identity)}
+                                                className="bg-green-500/20 hover:bg-green-500/30 text-green-400 text-[10px] font-bold py-1 px-2 rounded-md transition-colors w-full uppercase tracking-wider"
+                                            >
+                                                Admit
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
                 </div>
             )}
