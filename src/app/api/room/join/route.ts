@@ -44,9 +44,9 @@ export async function POST(req: NextRequest) {
         token.addGrant({
             roomJoin: true,
             room: roomId,
-            canPublish: false, // Initially disabled until admitted
+            canPublish: false, // Disables A/V publishing until admitted
             canSubscribe: true,
-            canPublishData: true
+            canPublishData: true // REQUIRED: Allows them to ping the host via DataChannel that they are waiting
         });
 
         // Generate JWT

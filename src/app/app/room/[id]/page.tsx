@@ -225,7 +225,7 @@ function RoomInterface({
     const { send: sendChatMessage, chatMessages, isSending } = useChat();
     const { send: sendReactionData, message: incomingReaction } = useDataChannel("reactions");
     const { send: sendHandUpdate, message: handMessage } = useDataChannel("hands");
-    const { send: sendWaitingRoomAuth, message: waitingRoomMsg } = useDataChannel("waiting-room");
+    const { send: sendSystemMessage, message: systemMessage } = useDataChannel("system");
     const connectionState = useConnectionState();
 
     // Host & Waiting Room Logic
@@ -236,10 +236,11 @@ function RoomInterface({
 
     // Process specialized data channel messages for the Waitlist flow
     useEffect(() => {
-        if (!waitingRoomMsg) return;
+        if (!systemMessage) return;
 
         try {
-            const data = JSON.parse(new TextDecoder().decode(waitingRoomMsg.payload));
+            const data = JSON.parse(new TextDecoder().decode(systemMessage.payload));
+            console.log("[System Channel] Received message:", data);
 
             if (isHost && data.type === 'guest_waiting') {
                 setWaitingGuests((prev: Array<{ identity: string, name: string }>) => {
@@ -252,28 +253,30 @@ function RoomInterface({
                 setHasBeenAdmitted(true);
             }
         } catch (e) {
-            console.error(e);
+            // Ignore non-JSON or other system messages
         }
-    }, [waitingRoomMsg, isHost, localParticipant.identity, setWaitingGuests, setHasBeenAdmitted]);
+    }, [systemMessage, isHost, localParticipant.identity, setWaitingGuests, setHasBeenAdmitted]);
 
     // Continuously broadcast presence to the host if stuck in the waiting room
     useEffect(() => {
         if (isInWaitingRoom && connectionState === ConnectionState.Connected) {
+            console.log("[System Channel] Started broadcasting guest presence.");
             const interval = setInterval(() => {
                 const msg = JSON.stringify({
                     type: 'guest_waiting',
                     identity: localParticipant.identity,
                     name: localParticipant.name || "Guest"
                 });
-                sendWaitingRoomAuth(new TextEncoder().encode(msg), { reliable: true });
+                sendSystemMessage(new TextEncoder().encode(msg), { reliable: true });
+                console.log("[System Channel] Ping sent.");
             }, 3000);
             return () => clearInterval(interval);
         }
-    }, [isInWaitingRoom, connectionState, localParticipant, sendWaitingRoomAuth]);
+    }, [isInWaitingRoom, connectionState, localParticipant, sendSystemMessage]);
 
     const handleAdmitGuest = (guestIdentity: string) => {
         const msg = JSON.stringify({ type: 'admit_guest', targetIdentity: guestIdentity });
-        sendWaitingRoomAuth(new TextEncoder().encode(msg), { reliable: true });
+        sendSystemMessage(new TextEncoder().encode(msg), { reliable: true });
         // Remove from local waiting list
         setWaitingGuests((prev: Array<{ identity: string, name: string }>) => prev.filter((g: any) => g.identity !== guestIdentity));
     };
