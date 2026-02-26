@@ -22,6 +22,7 @@ import {
     TrackReferenceOrPlaceholder,
     useConnectionState,
     useLocalParticipant,
+    useParticipants,
     useChat,
     useDataChannel,
     useRoomContext
@@ -210,7 +211,7 @@ function RoomInterface({
     const { send: sendReactionData, message: incomingReaction } = useDataChannel("reactions");
     const { send: sendHandUpdate, message: handMessage } = useDataChannel("hands");
     const connectionState = useConnectionState();
-
+    const participants = useParticipants(); // Added useParticipants
 
     // LiveKit Track Hooks for rendering grid layout
     const tracks = useTracks(
@@ -311,7 +312,7 @@ function RoomInterface({
 
                 <div className="px-3 py-1.5 bg-black/40 backdrop-blur-md rounded-lg border border-white/5 flex items-center gap-2">
                     <Users size={14} className="text-gray-400" />
-                    <span className="text-[12px] font-bold text-gray-300">1</span>
+                    <span className="text-[12px] font-bold text-gray-300">{participants.length}</span>
                 </div>
             </div>
 
@@ -537,7 +538,7 @@ function RoomInterface({
 
                 {/* Center: Main Controls */}
                 <div className="flex items-center gap-1 md:gap-4 bg-white/[0.02] border border-white/5 px-4 py-1.5 rounded-2xl shadow-xl">
-                    <ControlButton icon={<Users />} label="Participants" badge="1" hasArrow />
+                    <ControlButton icon={<Users />} label="Participants" badge={participants.length.toString()} hasArrow />
                     <ControlButton
                         icon={<MessageSquare />}
                         label="Chat"
