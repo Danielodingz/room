@@ -199,7 +199,13 @@ function RoomInterface({
 }) {
     // ── Account + Balance ──
     const { account } = useAccount();
-    const { data: balanceData } = useBalance({ address: address as `0x${string}`, token: TOKEN_CONTRACT });
+    const { data: balanceData } = useBalance({
+        address: address as `0x${string}`,
+        token: TOKEN_CONTRACT,
+        watch: true,
+        enabled: !!address,
+    });
+
 
     // ── UI State ──
     const [isHandRaised, setIsHandRaised] = useState(false);

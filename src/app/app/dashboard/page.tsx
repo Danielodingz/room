@@ -354,8 +354,17 @@ function WalletDrawer({ isOpen, onClose }: { isOpen: boolean, onClose: () => voi
 
     // STRK token on Sepolia — same as room page
     const STRK_CONTRACT = "0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d";
-    const { data: strkBalance } = useBalance({ address: address as `0x${string}`, token: STRK_CONTRACT });
-    const formattedBalance = strkBalance ? `${parseFloat(strkBalance.formatted).toFixed(4)} STRK` : "— STRK";
+    const { data: strkBalance, isLoading: balanceLoading } = useBalance({
+        address: address as `0x${string}`,
+        token: STRK_CONTRACT,
+        watch: true,          // auto-refresh every block
+        enabled: !!address,   // only fetch once address is available
+    });
+    const formattedBalance = balanceLoading
+        ? "Loading..."
+        : strkBalance
+            ? `${parseFloat(strkBalance.formatted).toFixed(4)} STRK`
+            : "0.0000 STRK";
 
     // Load tx history from localStorage
     useEffect(() => {
@@ -441,20 +450,12 @@ function WalletDrawer({ isOpen, onClose }: { isOpen: boolean, onClose: () => voi
 
                             {/* Earnings Section */}
                             <div className="bg-[#1C1C1E] rounded-[32px] p-6 border border-white/5 flex flex-col gap-4 shadow-lg">
-                                <span className="text-[15px] font-bold text-gray-400">Earnings</span>
+                                <span className="text-[15px] font-bold text-gray-400">Earnings (Received)</span>
                                 <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 relative">
-                                            <Image
-                                                src="/assets/images/usdc.png"
-                                                alt="USDC"
-                                                fill
-                                                className="object-contain"
-                                            />
-                                        </div>
-                                        <span className="text-[20px] font-bold">0 usdc</span>
-                                    </div>
-                                    <span className="text-gray-500 font-bold">~$0.00</span>
+                                    <span className="text-[20px] font-bold text-green-400">
+                                        +{txHistory.filter(t => t.direction === "received").reduce((sum, t) => sum + parseFloat(t.amount), 0).toFixed(4)} STRK
+                                    </span>
+                                    <span className="text-gray-500 font-bold text-[13px]">{txHistory.filter(t => t.direction === "received").length} payments</span>
                                 </div>
                                 <span className="text-[12px] text-gray-600 font-medium">All time on Room</span>
                             </div>
