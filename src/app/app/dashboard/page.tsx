@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { useAccount, useDisconnect } from "@starknet-react/core";
-import { loadTxHistory, TxRecord } from "@/lib/txHistory";
+import { loadTxHistory, saveTx, TxRecord } from "@/lib/txHistory";
 import { useStrkBalance } from "@/lib/useStrkBalance";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
@@ -28,6 +28,8 @@ import {
     Check,
     ArrowRight,
     ArrowLeft,
+    Loader2,
+    ExternalLink,
 } from "lucide-react";
 
 export default function DashboardPage() {
@@ -348,37 +350,76 @@ function LargeActionButton({ icon, label, color, description, hasDropdown = fals
 }
 
 function WalletDrawer({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) {
-    const { address } = useAccount();
+    const { address, account } = useAccount();
     const [view, setView] = useState<'home' | 'send' | 'receive'>('home');
     const [copied, setCopied] = useState(false);
     const [txHistory, setTxHistory] = useState<TxRecord[]>([]);
 
+    // Send state
+    const [sendTo, setSendTo] = useState("");
+    const [sendAmount, setSendAmount] = useState("");
+    const [sendStatus, setSendStatus] = useState<"idle" | "pending" | "success" | "error">("idle");
+    const [sendTxHash, setSendTxHash] = useState("");
+    const [sendError, setSendError] = useState("");
+
+    const STRK_CONTRACT = "0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d";
+    const TOKEN_MIN = 0.5;
     const { formatted: strkFormatted, isLoading: balanceLoading } = useStrkBalance(address);
-    const formattedBalance = balanceLoading
-        ? "Loading..."
-        : `${strkFormatted} STRK`;
+    const formattedBalance = balanceLoading ? "Loading..." : `${strkFormatted} STRK`;
 
     // Load tx history from localStorage
     useEffect(() => {
-        if (address) {
-            setTxHistory(loadTxHistory(address));
-        }
-    }, [address, isOpen]); // re-load when drawer opens
+        if (address) setTxHistory(loadTxHistory(address));
+    }, [address, isOpen, sendStatus]); // re-load after sends too
 
-    const handleCopy = () => {
-        if (address) {
-            navigator.clipboard.writeText(address);
-            setCopied(true);
-            setTimeout(() => setCopied(false), 2000);
+    // Reset send form when switching views
+    useEffect(() => {
+        if (view !== 'send') {
+            setSendStatus("idle"); setSendTxHash(""); setSendError("");
+        }
+    }, [view]);
+
+    // Reset views when drawer closes
+    useEffect(() => {
+        if (!isOpen) setTimeout(() => setView('home'), 500);
+    }, [isOpen]);
+
+    const handleSend = async () => {
+        if (!account || !sendTo.trim()) return;
+        const amount = parseFloat(sendAmount);
+        if (!amount || amount < TOKEN_MIN) return;
+        try {
+            setSendStatus("pending");
+            const DECIMALS_FACTOR = 1_000_000_000_000_000_000n;
+            const amountRaw = BigInt(Math.round(amount * 1e9)) * (DECIMALS_FACTOR / 1_000_000_000n);
+            const U128_MAX = 340282366920938463463374607431768211456n;
+            const low = amountRaw % U128_MAX;
+            const high = amountRaw / U128_MAX;
+            const result = await account.execute([{
+                contractAddress: STRK_CONTRACT,
+                entrypoint: "transfer",
+                calldata: [sendTo.trim(), low.toString(), high.toString()]
+            }]);
+            setSendTxHash(result.transaction_hash);
+            setSendStatus("success");
+            if (address) {
+                saveTx(address, {
+                    txHash: result.transaction_hash,
+                    from: address.slice(0, 6) + "..." + address.slice(-4),
+                    fromAddress: address,
+                    to: sendTo.trim().slice(0, 6) + "..." + sendTo.trim().slice(-4),
+                    toAddress: sendTo.trim(),
+                    amount: amount.toString(),
+                    symbol: "STRK",
+                    timestamp: Date.now(),
+                    direction: "sent"
+                });
+            }
+        } catch (err: any) {
+            setSendError(err?.message || "Transaction failed");
+            setSendStatus("error");
         }
     };
-
-    // Reset view when drawer closes
-    useEffect(() => {
-        if (!isOpen) {
-            setTimeout(() => setView('home'), 500);
-        }
-    }, [isOpen]);
 
     return (
         <div className={`absolute inset-0 z-50 transition-all duration-500 flex justify-end ${isOpen ? "visible" : "invisible pointer-events-none"}`}>
@@ -431,6 +472,12 @@ function WalletDrawer({ isOpen, onClose }: { isOpen: boolean, onClose: () => voi
                                 </div>
 
                                 <div className="flex gap-3 relative z-10">
+                                    <button
+                                        onClick={() => { setSendStatus("idle"); setSendTxHash(""); setSendError(""); setSendTo(""); setSendAmount(""); setView('send'); }}
+                                        className="flex-1 bg-yellow-500 hover:bg-yellow-400 text-black font-black py-4 rounded-2xl transition-all shadow-lg shadow-yellow-500/20 active:scale-95"
+                                    >
+                                        Send
+                                    </button>
                                     <button
                                         onClick={() => setView('receive')}
                                         className="flex-1 bg-[#2C2C2E] hover:bg-[#3A3A3C] text-white font-black py-4 rounded-2xl transition-all border border-white/5 active:scale-95"
@@ -502,45 +549,97 @@ function WalletDrawer({ isOpen, onClose }: { isOpen: boolean, onClose: () => voi
                     )}
 
                     {view === 'send' && (
-                        <div className="flex flex-col gap-8 animate-in fade-in slide-in-from-right-4 duration-500">
+                        <div className="flex flex-col gap-6 animate-in fade-in slide-in-from-right-4 duration-500">
                             <div>
-                                <h1 className="text-[40px] font-extrabold leading-[1.1] tracking-tight mb-2">Send<br />USDC</h1>
-                                <p className="text-gray-500 font-medium">Send USDC to any Starknet wallet instantly.</p>
+                                <h1 className="text-[40px] font-extrabold leading-[1.1] tracking-tight mb-2">Send<br />STRK</h1>
+                                <p className="text-gray-500 font-medium">Send STRK to any Starknet wallet instantly.</p>
                             </div>
 
-                            <div className="flex flex-col gap-6">
-                                <div className="flex flex-col gap-3">
-                                    <label className="text-[13px] font-bold text-gray-400 uppercase tracking-widest px-2">Recipient Address</label>
-                                    <div className="bg-[#1C1C1E] rounded-2xl border border-white/5 p-4 focus-within:border-blue-500/50 transition-all">
-                                        <input
-                                            type="text"
-                                            placeholder="Enter Starknet address (0x...)"
-                                            className="bg-transparent border-none outline-none w-full text-white placeholder:text-gray-600 font-medium"
-                                        />
+                            {sendStatus !== 'success' ? (
+                                <div className="flex flex-col gap-5">
+                                    <div className="flex flex-col gap-2">
+                                        <label className="text-[13px] font-bold text-gray-400 uppercase tracking-widest px-1">Recipient Address</label>
+                                        <div className="bg-[#1C1C1E] rounded-2xl border border-white/10 p-4 focus-within:border-yellow-500/50 transition-all">
+                                            <input
+                                                type="text"
+                                                placeholder="0x..."
+                                                value={sendTo}
+                                                onChange={e => setSendTo(e.target.value)}
+                                                disabled={sendStatus === 'pending'}
+                                                className="bg-transparent border-none outline-none w-full text-white placeholder:text-gray-600 font-mono text-[13px]"
+                                            />
+                                        </div>
                                     </div>
-                                </div>
 
-                                <div className="flex flex-col gap-3">
-                                    <label className="text-[13px] font-bold text-gray-400 uppercase tracking-widest px-2">Amount (USDC)</label>
-                                    <div className="bg-[#1C1C1E] rounded-2xl border border-white/5 p-4 flex items-center justify-between focus-within:border-blue-500/50 transition-all">
-                                        <input
-                                            type="number"
-                                            placeholder="0.00"
-                                            className="bg-transparent border-none outline-none w-full text-white placeholder:text-gray-600 font-bold text-[24px]"
-                                        />
-                                        <span className="text-blue-400 font-black text-[14px] uppercase tracking-wider">Max</span>
+                                    <div className="flex flex-col gap-2">
+                                        <label className="text-[13px] font-bold text-gray-400 uppercase tracking-widest px-1">Amount (STRK)</label>
+                                        <div className="bg-[#1C1C1E] rounded-2xl border border-white/10 p-4 flex items-center justify-between focus-within:border-yellow-500/50 transition-all">
+                                            <input
+                                                type="number"
+                                                placeholder="0.5"
+                                                min="0.5"
+                                                step="0.1"
+                                                value={sendAmount}
+                                                onChange={e => setSendAmount(e.target.value)}
+                                                disabled={sendStatus === 'pending'}
+                                                className="bg-transparent border-none outline-none w-full text-white placeholder:text-gray-600 font-bold text-[22px]"
+                                            />
+                                            <button
+                                                onClick={() => setSendAmount(strkFormatted)}
+                                                className="text-yellow-400 font-black text-[13px] uppercase tracking-wider hover:text-yellow-300"
+                                            >Max</button>
+                                        </div>
+                                        <div className="flex justify-between px-1">
+                                            <span className="text-[12px] text-gray-500">Balance: {formattedBalance}</span>
+                                            <span className="text-[12px] text-gray-600">Min: 0.5 STRK</span>
+                                        </div>
                                     </div>
-                                    <div className="flex justify-between px-2">
-                                        <span className="text-[12px] text-gray-500 font-medium">Balance: 0 USDC</span>
-                                        <span className="text-[12px] text-gray-500 font-medium">~$0.00</span>
-                                    </div>
-                                </div>
-                            </div>
 
-                            <button className="w-full bg-[#2775CA] hover:bg-[#1E5DA1] text-white font-black py-5 rounded-[24px] transition-all shadow-xl shadow-blue-500/10 flex items-center justify-center gap-3 mt-4 active:scale-95 group/sendbtn">
-                                <span>Continue</span>
-                                <ArrowRight size={20} className="group-hover/sendbtn:translate-x-1 transition-transform" />
-                            </button>
+                                    {sendStatus === 'error' && (
+                                        <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-4 text-red-400 text-[13px] font-medium">
+                                            {sendError}
+                                        </div>
+                                    )}
+
+                                    <button
+                                        onClick={handleSend}
+                                        disabled={sendStatus === 'pending' || !sendTo.trim() || parseFloat(sendAmount) < TOKEN_MIN}
+                                        className="w-full bg-yellow-500 hover:bg-yellow-400 disabled:opacity-40 text-black font-black py-5 rounded-[24px] transition-all shadow-xl shadow-yellow-500/10 flex items-center justify-center gap-3 active:scale-95"
+                                    >
+                                        {sendStatus === 'pending' ? (
+                                            <><Loader2 size={20} className="animate-spin" />Sending...</>
+                                        ) : (
+                                            <><ArrowRight size={20} />Send {sendAmount || '0'} STRK</>
+                                        )}
+                                    </button>
+                                </div>
+                            ) : (
+                                <div className="flex flex-col items-center gap-6 py-8 text-center">
+                                    <div className="w-20 h-20 bg-green-500/10 rounded-full flex items-center justify-center border border-green-500/20">
+                                        <Check size={36} className="text-green-400" />
+                                    </div>
+                                    <div>
+                                        <p className="text-[20px] font-black text-white">Sent!</p>
+                                        <p className="text-gray-500 text-[14px] mt-1">{sendAmount} STRK sent successfully</p>
+                                    </div>
+                                    {sendTxHash && (
+                                        <a
+                                            href={`https://sepolia.voyager.online/tx/${sendTxHash}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="flex items-center gap-2 text-blue-400 hover:text-blue-300 text-[13px] font-bold"
+                                        >
+                                            <ExternalLink size={14} />View on Voyager
+                                        </a>
+                                    )}
+                                    <button
+                                        onClick={() => { setSendStatus('idle'); setSendTo(''); setSendAmount(''); }}
+                                        className="w-full bg-white/5 border border-white/10 text-white font-black py-4 rounded-2xl transition-all hover:bg-white/10 active:scale-95"
+                                    >
+                                        Send Again
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     )}
 
@@ -570,7 +669,9 @@ function WalletDrawer({ isOpen, onClose }: { isOpen: boolean, onClose: () => voi
                                 </div>
 
                                 <div className="flex flex-col items-center gap-4 w-full">
-                                    <div className="bg-black/40 rounded-2xl border border-white/5 p-4 w-full group/addr cursor-pointer hover:bg-black/60 transition-all" onClick={handleCopy}>
+                                    <div className="bg-black/40 rounded-2xl border border-white/5 p-4 w-full group/addr cursor-pointer hover:bg-black/60 transition-all"
+                                        onClick={() => { if (address) { navigator.clipboard.writeText(address); setCopied(true); setTimeout(() => setCopied(false), 2000); } }}
+                                    >
                                         <div className="flex flex-col gap-1">
                                             <span className="text-gray-500 text-[11px] font-bold uppercase tracking-widest">Your Address</span>
                                             <div className="flex items-center justify-between gap-4">
@@ -585,7 +686,7 @@ function WalletDrawer({ isOpen, onClose }: { isOpen: boolean, onClose: () => voi
                                     </div>
 
                                     <button
-                                        onClick={handleCopy}
+                                        onClick={() => { if (address) { navigator.clipboard.writeText(address); setCopied(true); setTimeout(() => setCopied(false), 2000); } }}
                                         className={`w-full font-black py-4 rounded-[20px] transition-all flex items-center justify-center gap-2 border active:scale-95
                                             ${copied ? 'bg-green-500 border-green-500 text-white' : 'bg-white/5 border-white/5 text-gray-300 hover:bg-white/10 hover:border-white/10'}
                                         `}
