@@ -31,9 +31,10 @@ import {
 import { Track, ConnectionState, Participant, LocalParticipant } from "livekit-client";
 import PreJoinScreen from "@/components/PreJoinScreen";
 
-// Starknet USDC contract on Mainnet
-const USDC_CONTRACT = "0x053c91253bc9682c04929ca02ed00b3e423f6710d2ee7e0d5ebb06f3ecf368a8";
+// Starknet USDC contract on Sepolia Testnet
+const USDC_CONTRACT = "0x005a643907b9a4bc6a55e9069c4fd5fd1f5c79a22470690f75556c4736e34426";
 const USDC_DECIMALS = 6;
+const VOYAGER_BASE = "https://sepolia.voyager.online/tx";
 
 export default function MeetingRoomPage() {
     const params = useParams();
@@ -664,7 +665,7 @@ function RoomInterface({
                                     </div>
                                     {txHash && (
                                         <a
-                                            href={`https://voyager.online/tx/${txHash}`}
+                                            href={`${VOYAGER_BASE}/${txHash}`}
                                             target="_blank"
                                             rel="noopener noreferrer"
                                             className="flex items-center gap-2 text-[12px] text-blue-400 hover:text-blue-300 transition-colors"
@@ -718,8 +719,8 @@ function RoomInterface({
                                                             key={p.identity}
                                                             onClick={() => setUsdcRecipient({ name, walletAddress: p.identity })}
                                                             className={`flex items-center gap-3 p-3.5 rounded-2xl border transition-all text-left ${isSelected
-                                                                    ? "bg-yellow-500/10 border-yellow-500/40 text-yellow-300"
-                                                                    : "bg-white/[0.02] border-white/5 hover:bg-white/5 hover:border-white/10"
+                                                                ? "bg-yellow-500/10 border-yellow-500/40 text-yellow-300"
+                                                                : "bg-white/[0.02] border-white/5 hover:bg-white/5 hover:border-white/10"
                                                                 }`}
                                                         >
                                                             <div className={`w-8 h-8 rounded-full flex items-center justify-center text-[13px] font-bold ${isSelected ? "bg-yellow-500/20 text-yellow-300" : "bg-white/10 text-gray-300"}`}>
@@ -752,8 +753,8 @@ function RoomInterface({
                                                     key={amt}
                                                     onClick={() => { setUsdcAmount(amt); setCustomAmount(""); }}
                                                     className={`py-2.5 rounded-xl text-[13px] font-bold transition-all border ${usdcAmount === amt && !customAmount
-                                                            ? "bg-yellow-500 text-black border-yellow-500 shadow-lg shadow-yellow-500/20"
-                                                            : "bg-white/5 text-gray-300 border-white/10 hover:border-yellow-500/40"
+                                                        ? "bg-yellow-500 text-black border-yellow-500 shadow-lg shadow-yellow-500/20"
+                                                        : "bg-white/5 text-gray-300 border-white/10 hover:border-yellow-500/40"
                                                         }`}
                                                 >
                                                     {amt}
