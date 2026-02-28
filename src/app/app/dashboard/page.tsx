@@ -1,9 +1,10 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { useAccount, useDisconnect } from "@starknet-react/core";
+import { useAccount, useDisconnect, useReadContract } from "@starknet-react/core";
 import { loadTxHistory, saveTx, TxRecord } from "@/lib/txHistory";
 import { useStrkBalance } from "@/lib/useStrkBalance";
+import { ROOM_VAULT_ADDRESS, ROOM_VAULT_ABI, STRK_ADDRESS, STRK_APPROVE_ABI, toU256Calldata } from "@/lib/roomVault";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
@@ -362,11 +363,95 @@ function WalletDrawer({ isOpen, onClose }: { isOpen: boolean, onClose: () => voi
     const [sendTxHash, setSendTxHash] = useState("");
     const [sendError, setSendError] = useState("");
 
-    const STRK_CONTRACT = "0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d";
+    const STRK_CONTRACT = STRK_ADDRESS;
     const TOKEN_MIN = 0.5;
     const { formatted: strkFormatted, isLoading: balanceLoading } = useStrkBalance(address);
     const formattedBalance = balanceLoading ? "Loading..." : `${strkFormatted} STRK`;
 
+    // Read Room Vault on-chain balance
+    const vaultDeployed = ROOM_VAULT_ADDRESS !== "PLACEHOLDER_ROOM_VAULT_ADDRESS";
+    const { data: vaultRawBalance, refetch: refetchVault } = useReadContract({
+        abi: ROOM_VAULT_ABI,
+        address: ROOM_VAULT_ADDRESS as `0x${string}`,
+        functionName: "get_balance",
+        // @ts-expect-error starknet-react args loosely typed
+        args: address ? [address] : [],
+        enabled: vaultDeployed && !!address,
+        watch: true,
+    });
+    const vaultBalance = (() => {
+        if (!vaultDeployed) return "0.0000";
+        if (!vaultRawBalance) return "0.0000";
+        try {
+            const d = vaultRawBalance as any;
+            const raw = d.low !== undefined
+                ? BigInt(d.low.toString()) + BigInt(d.high?.toString() || '0') * 340282366920938463463374607431768211456n
+                : BigInt(d.toString());
+            return (Number(raw) / 1e18).toFixed(4);
+        } catch { return "0.0000"; }
+    })();
+
+    // Withdraw state (Room Vault → Argent wallet)
+    const [withdrawTo, setWithdrawTo] = useState(address || "");
+    const [withdrawAmount, setWithdrawAmount] = useState("");
+    const [withdrawStatus, setWithdrawStatus] = useState<"idle" | "pending" | "success" | "error">("idle");
+    const [withdrawTxHash, setWithdrawTxHash] = useState("");
+    const [withdrawError, setWithdrawError] = useState("");
+
+    const handleWithdraw = async () => {
+        if (!account || !withdrawTo.trim()) return;
+        const amount = parseFloat(withdrawAmount);
+        if (!amount || amount < 0.001) return;
+        try {
+            setWithdrawStatus("pending");
+            const [low, high] = toU256Calldata(amount);
+            const result = await account.execute([{
+                contractAddress: ROOM_VAULT_ADDRESS,
+                entrypoint: "withdraw",
+                calldata: [low, high, withdrawTo.trim()]
+            }]);
+            setWithdrawTxHash(result.transaction_hash);
+            setWithdrawStatus("success");
+            refetchVault();
+        } catch (err: any) {
+            setWithdrawError(err?.message || "Withdrawal failed");
+            setWithdrawStatus("error");
+        }
+    };
+
+    // Deposit state (Argent wallet → Room Vault)
+    const [depositAmount, setDepositAmount] = useState("");
+    const [depositStatus, setDepositStatus] = useState<"idle" | "pending" | "success" | "error">("idle");
+    const [depositError, setDepositError] = useState("");
+
+    const handleDeposit = async () => {
+        if (!account) return;
+        const amount = parseFloat(depositAmount);
+        if (!amount || amount < 0.1) return;
+        try {
+            setDepositStatus("pending");
+            const [low, high] = toU256Calldata(amount);
+            // Step 1: approve vault to spend STRK
+            // Step 2: deposit into vault — both in one multicall
+            const result = await account.execute([
+                {
+                    contractAddress: STRK_CONTRACT,
+                    entrypoint: "approve",
+                    calldata: [ROOM_VAULT_ADDRESS, low, high]
+                },
+                {
+                    contractAddress: ROOM_VAULT_ADDRESS,
+                    entrypoint: "deposit",
+                    calldata: [low, high]
+                }
+            ]);
+            setDepositStatus("success");
+            refetchVault();
+        } catch (err: any) {
+            setDepositError(err?.message || "Deposit failed");
+            setDepositStatus("error");
+        }
+    };
     // Load tx history from localStorage
     useEffect(() => {
         if (address) setTxHistory(loadTxHistory(address));
@@ -462,21 +547,18 @@ function WalletDrawer({ isOpen, onClose }: { isOpen: boolean, onClose: () => voi
                                         </div>
                                         <span className="text-[13px] font-medium uppercase tracking-wider text-yellow-400">Room Wallet</span>
                                     </div>
-                                    <span className="text-[11px] text-gray-600 uppercase tracking-wider">STRK</span>
+                                    {!vaultDeployed && (
+                                        <span className="text-[10px] text-orange-400 bg-orange-500/10 border border-orange-500/20 px-2 py-0.5 rounded-full">Contract pending</span>
+                                    )}
                                 </div>
 
-                                {/* Main balance = total received via Room */}
+                                {/* Main balance = on-chain Room Vault balance */}
                                 <div className="flex flex-col relative z-10 gap-1">
                                     <div className="flex items-baseline gap-3">
-                                        <span className="text-[36px] font-black">
-                                            {txHistory.filter(t => t.direction === "received").reduce((sum, t) => sum + parseFloat(t.amount), 0).toFixed(4)}
-                                        </span>
+                                        <span className="text-[36px] font-black">{vaultBalance}</span>
                                         <span className="text-yellow-400 font-bold">STRK</span>
                                     </div>
-                                    <p className="text-[12px] text-gray-500">
-                                        {txHistory.filter(t => t.direction === "received").length} payments received via Room
-                                    </p>
-                                    {/* Argent wallet balance shown as secondary */}
+                                    <p className="text-[12px] text-gray-500">Held in Room smart contract</p>
                                     <p className="text-[12px] text-gray-600 mt-1">
                                         Argent wallet: {balanceLoading ? "Loading..." : `${strkFormatted} STRK`}
                                     </p>
@@ -490,7 +572,7 @@ function WalletDrawer({ isOpen, onClose }: { isOpen: boolean, onClose: () => voi
                                         Send
                                     </button>
                                     <button
-                                        onClick={() => setView('receive')}
+                                        onClick={() => { setWithdrawStatus("idle"); setWithdrawTxHash(""); setWithdrawError(""); setWithdrawTo(address || ""); setWithdrawAmount(""); setView('receive'); }}
                                         className="flex-1 bg-[#2C2C2E] hover:bg-[#3A3A3C] text-white font-black py-4 rounded-2xl transition-all border border-white/5 active:scale-95"
                                     >
                                         Withdraw
@@ -643,78 +725,87 @@ function WalletDrawer({ isOpen, onClose }: { isOpen: boolean, onClose: () => voi
                     )}
 
                     {view === 'receive' && (
-                        <div className="flex flex-col gap-8 animate-in fade-in slide-in-from-right-4 duration-500">
+                        <div className="flex flex-col gap-6 animate-in fade-in slide-in-from-right-4 duration-500">
                             <div>
-                                <h1 className="text-[40px] font-extrabold leading-[1.1] tracking-tight mb-2">Receive<br />USDC</h1>
-                                <p className="text-gray-500 font-medium">Your Starknet address to receive assets.</p>
+                                <h1 className="text-[40px] font-extrabold leading-[1.1] tracking-tight mb-2">Withdraw<br />STRK</h1>
+                                <p className="text-gray-500 font-medium">Move STRK from your Room Wallet to any address.</p>
                             </div>
 
-                            <div className="bg-[#1C1C1E] rounded-[40px] p-10 border border-white/5 flex flex-col items-center gap-8 shadow-2xl relative overflow-hidden">
-                                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-blue-500/50 to-transparent" />
-
-                                <div className="w-48 h-48 bg-white rounded-3xl p-4 flex items-center justify-center shadow-inner relative group/qr">
-                                    {/* Placeholder for QR Code */}
-                                    <div className="w-full h-full bg-gray-100 rounded-xl flex items-center justify-center">
-                                        <div className="w-32 h-32 border-4 border-dashed border-gray-300 rounded-lg flex items-center justify-center">
-                                            <span className="text-gray-400 font-black text-[12px] uppercase">QR Code</span>
-                                        </div>
-                                    </div>
-                                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover/qr:opacity-100 transition-opacity rounded-3xl flex items-center justify-center flex-col gap-2">
-                                        <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center">
-                                            <div className="w-2 h-2 bg-blue-500 rounded-full animate-ping" />
-                                        </div>
-                                        <span className="text-white text-[12px] font-bold">Scanning active</span>
-                                    </div>
+                            {!vaultDeployed ? (
+                                <div className="bg-orange-500/10 border border-orange-500/20 rounded-2xl p-6 flex flex-col gap-3 items-center text-center">
+                                    <span className="text-orange-400 font-black text-[16px]">Smart contract not yet deployed</span>
+                                    <p className="text-orange-300/60 text-[13px]">The RoomVault contract is being deployed to Sepolia. Once deployed, withdrawals will be enabled. Room received balance shows in-room transfers.</p>
                                 </div>
+                            ) : withdrawStatus !== 'success' ? (
+                                <div className="flex flex-col gap-5">
+                                    <div className="flex flex-col gap-2">
+                                        <label className="text-[13px] font-bold text-gray-400 uppercase tracking-widest px-1">Amount (STRK)</label>
+                                        <div className="bg-[#1C1C1E] rounded-2xl border border-white/10 p-4 flex items-center justify-between focus-within:border-yellow-500/50 transition-all">
+                                            <input
+                                                type="number"
+                                                placeholder="0.00"
+                                                min="0.001"
+                                                step="0.1"
+                                                value={withdrawAmount}
+                                                onChange={e => setWithdrawAmount(e.target.value)}
+                                                disabled={withdrawStatus === 'pending'}
+                                                className="bg-transparent border-none outline-none w-full text-white placeholder:text-gray-600 font-bold text-[22px]"
+                                            />
+                                            <button onClick={() => setWithdrawAmount(vaultBalance)} className="text-yellow-400 font-black text-[13px] uppercase tracking-wider hover:text-yellow-300">Max</button>
+                                        </div>
+                                        <span className="text-[12px] text-gray-500 px-1">Room Vault balance: {vaultBalance} STRK</span>
+                                    </div>
 
-                                <div className="flex flex-col items-center gap-4 w-full">
-                                    <div className="bg-black/40 rounded-2xl border border-white/5 p-4 w-full group/addr cursor-pointer hover:bg-black/60 transition-all"
-                                        onClick={() => { if (address) { navigator.clipboard.writeText(address); setCopied(true); setTimeout(() => setCopied(false), 2000); } }}
-                                    >
-                                        <div className="flex flex-col gap-1">
-                                            <span className="text-gray-500 text-[11px] font-bold uppercase tracking-widest">Your Address</span>
-                                            <div className="flex items-center justify-between gap-4">
-                                                <span className="text-white font-mono break-all text-[14px] leading-relaxed">
-                                                    {address}
-                                                </span>
-                                                <div className={`p-2 rounded-lg transition-all ${copied ? 'bg-green-500/20 text-green-400' : 'bg-white/5 text-gray-400 group-hover/addr:text-white group-hover/addr:bg-white/10'}`}>
-                                                    {copied ? <Check size={18} /> : <Copy size={18} />}
-                                                </div>
-                                            </div>
+                                    <div className="flex flex-col gap-2">
+                                        <label className="text-[13px] font-bold text-gray-400 uppercase tracking-widest px-1">Destination Address</label>
+                                        <div className="bg-[#1C1C1E] rounded-2xl border border-white/10 p-4 focus-within:border-yellow-500/50 transition-all">
+                                            <input
+                                                type="text"
+                                                placeholder="0x... (defaults to your Argent wallet)"
+                                                value={withdrawTo}
+                                                onChange={e => setWithdrawTo(e.target.value)}
+                                                disabled={withdrawStatus === 'pending'}
+                                                className="bg-transparent border-none outline-none w-full text-white placeholder:text-gray-600 font-mono text-[12px]"
+                                            />
                                         </div>
                                     </div>
+
+                                    {withdrawStatus === 'error' && (
+                                        <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-4 text-red-400 text-[13px]">{withdrawError}</div>
+                                    )}
 
                                     <button
-                                        onClick={() => { if (address) { navigator.clipboard.writeText(address); setCopied(true); setTimeout(() => setCopied(false), 2000); } }}
-                                        className={`w-full font-black py-4 rounded-[20px] transition-all flex items-center justify-center gap-2 border active:scale-95
-                                            ${copied ? 'bg-green-500 border-green-500 text-white' : 'bg-white/5 border-white/5 text-gray-300 hover:bg-white/10 hover:border-white/10'}
-                                        `}
+                                        onClick={handleWithdraw}
+                                        disabled={withdrawStatus === 'pending' || !withdrawTo.trim() || parseFloat(withdrawAmount) <= 0}
+                                        className="w-full bg-yellow-500 hover:bg-yellow-400 disabled:opacity-40 text-black font-black py-5 rounded-[24px] transition-all shadow-xl shadow-yellow-500/10 flex items-center justify-center gap-3 active:scale-95"
                                     >
-                                        {copied ? (
-                                            <>
-                                                <Check size={20} />
-                                                <span>Copied!</span>
-                                            </>
+                                        {withdrawStatus === 'pending' ? (
+                                            <><Loader2 size={20} className="animate-spin" />Withdrawing...</>
                                         ) : (
-                                            <>
-                                                <Copy size={20} />
-                                                <span>Copy Address</span>
-                                            </>
+                                            <><ArrowLeft size={20} />Withdraw {withdrawAmount || '0'} STRK</>
                                         )}
                                     </button>
                                 </div>
-                            </div>
-
-                            <div className="bg-blue-500/5 border border-blue-500/10 rounded-2xl p-4 flex gap-4">
-                                <div className="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center shrink-0">
-                                    <span className="text-blue-400 font-bold text-[14px]">!</span>
+                            ) : (
+                                <div className="flex flex-col items-center gap-6 py-8 text-center">
+                                    <div className="w-20 h-20 bg-green-500/10 rounded-full flex items-center justify-center border border-green-500/20">
+                                        <Check size={36} className="text-green-400" />
+                                    </div>
+                                    <div>
+                                        <p className="text-[20px] font-black text-white">Withdrawn!</p>
+                                        <p className="text-gray-500 text-[14px] mt-1">{withdrawAmount} STRK sent to your wallet</p>
+                                    </div>
+                                    {withdrawTxHash && (
+                                        <a href={`https://sepolia.voyager.online/tx/${withdrawTxHash}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-blue-400 hover:text-blue-300 text-[13px] font-bold">
+                                            <ExternalLink size={14} />View on Voyager
+                                        </a>
+                                    )}
+                                    <button onClick={() => { setWithdrawStatus('idle'); setWithdrawAmount(''); }} className="w-full bg-white/5 border border-white/10 text-white font-black py-4 rounded-2xl transition-all hover:bg-white/10 active:scale-95">Withdraw Again</button>
                                 </div>
-                                <p className="text-[12px] text-blue-300/60 font-medium leading-relaxed">
-                                    Only send USDC assets to this address. Sending other tokens may result in permanent loss.
-                                </p>
-                            </div>
+                            )}
                         </div>
                     )}
+
                 </div>
             </div>
         </div>
