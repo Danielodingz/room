@@ -10,7 +10,7 @@ import {
     ShieldCheck, Gift, Coins, Loader2, Hand, CheckCircle2, AlertCircle,
     ExternalLink, AtSign, DollarSign
 } from "lucide-react";
-import { useAccount } from "@starknet-react/core";
+import { useAccount, useBalance } from "@starknet-react/core";
 import {
     LiveKitRoom,
     RoomAudioRenderer,
@@ -31,9 +31,11 @@ import {
 import { Track, ConnectionState, Participant, LocalParticipant } from "livekit-client";
 import PreJoinScreen from "@/components/PreJoinScreen";
 
-// Starknet USDC contract on Sepolia Testnet
-const USDC_CONTRACT = "0x005a643907b9a4bc6a55e9069c4fd5fd1f5c79a22470690f75556c4736e34426";
-const USDC_DECIMALS = 6;
+// STRK token on Starknet Sepolia Testnet (get from faucet.starknet.io)
+const TOKEN_CONTRACT = "0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d";
+const TOKEN_SYMBOL = "STRK";
+const TOKEN_DECIMALS = 18;
+const TOKEN_MIN = 0.5; // minimum send amount
 const VOYAGER_BASE = "https://sepolia.voyager.online/tx";
 
 export default function MeetingRoomPage() {
@@ -194,8 +196,9 @@ function RoomInterface({
     onLeave: () => void,
     isInitialHost: boolean
 }) {
-    // ── Account (needed for USDC send) ──
+    // ── Account + Balance ──
     const { account } = useAccount();
+    const { data: balanceData } = useBalance({ address: address as `0x${string}`, token: TOKEN_CONTRACT });
 
     // ── UI State ──
     const [isHandRaised, setIsHandRaised] = useState(false);
@@ -205,20 +208,23 @@ function RoomInterface({
     const [chatInput, setChatInput] = useState("");
     const [activeReaction, setActiveReaction] = useState<{ emoji: string, from: string } | null>(null);
 
-    // ── USDC Send State ──
+    // ── Token Send State ──
     const [isSendUsdcOpen, setIsSendUsdcOpen] = useState(false);
     const [usdcRecipient, setUsdcRecipient] = useState<{ name: string, walletAddress: string } | null>(null);
-    const [usdcAmount, setUsdcAmount] = useState(5);
+    const [usdcAmount, setUsdcAmount] = useState(1);
     const [customAmount, setCustomAmount] = useState("");
     const [txStatus, setTxStatus] = useState<"idle" | "pending" | "success" | "error">("idle");
     const [txHash, setTxHash] = useState("");
     const [txError, setTxError] = useState("");
+    // ── Payment received notification ──
+    const [paymentNotif, setPaymentNotif] = useState<{ from: string, amount: string } | null>(null);
 
     // ── LiveKit Hooks ──
     const { localParticipant, isMicrophoneEnabled, isCameraEnabled, isScreenShareEnabled } = useLocalParticipant();
     const { send: sendChatMessage, chatMessages, isSending } = useChat();
     const { send: sendReactionData, message: incomingReaction } = useDataChannel("reactions");
     const { send: sendHandUpdate, message: handMessage } = useDataChannel("hands");
+    const { send: sendPaymentNotif, message: incomingPayment } = useDataChannel("payments");
     const participants = useParticipants();
 
     const role = localParticipant?.metadata ? JSON.parse(localParticipant.metadata).role : "participant";
@@ -319,41 +325,71 @@ function RoomInterface({
         setIsSendUsdcOpen(true);
     };
 
-    const handleSendUsdc = async () => {
+    const handleSendToken = async () => {
         if (!account || !usdcRecipient) return;
-        const finalAmount = customAmount ? parseInt(customAmount) : usdcAmount;
-        if (!finalAmount || finalAmount <= 0) return;
+        const finalAmount = customAmount ? parseFloat(customAmount) : usdcAmount;
+        if (!finalAmount || finalAmount < TOKEN_MIN) return;
 
         try {
             setTxStatus("pending");
-            // USDC has 6 decimals: 5 USDC = 5_000_000
-            const amountRaw = BigInt(finalAmount) * BigInt(10 ** USDC_DECIMALS);
+            // STRK has 18 decimals — use floating point safe bigint conversion
+            const wholeUnits = Math.floor(finalAmount);
+            const fracUnits = Math.round((finalAmount - wholeUnits) * 1e9); // 9 decimal precision
+            const amountRaw = BigInt(wholeUnits) * BigInt(10 ** TOKEN_DECIMALS) + BigInt(fracUnits) * BigInt(10 ** (TOKEN_DECIMALS - 9));
+
             const result = await account.execute([{
-                contractAddress: USDC_CONTRACT,
+                contractAddress: TOKEN_CONTRACT,
                 entrypoint: "transfer",
                 calldata: [
                     usdcRecipient.walletAddress,
                     amountRaw.toString(),
-                    "0"  // uint256 high bits = 0 for small amounts
+                    "0"  // uint256 high = 0 for amounts < 2^128
                 ]
             }]);
             setTxHash(result.transaction_hash);
             setTxStatus("success");
+            // Notify the recipient via LiveKit data channel
+            const notifPayload = JSON.stringify({
+                to: usdcRecipient.walletAddress,
+                from: userIdentifier,
+                amount: finalAmount.toString()
+            });
+            sendPaymentNotif(new TextEncoder().encode(notifPayload), { reliable: true });
         } catch (err: any) {
-            console.error("USDC send error:", err);
+            console.error("Token send error:", err);
             setTxError(err?.message || "Transaction failed");
             setTxStatus("error");
         }
     };
 
-    // Participants available to receive USDC (exclude self)
+    // Participants available to receive token (exclude self)
     const otherParticipants = participants.filter(p => p.identity !== address);
+
+    // Formatted STRK balance for display
+    const formattedBalance = balanceData
+        ? `${parseFloat(balanceData.formatted).toFixed(2)} ${TOKEN_SYMBOL}`
+        : null;
+
+    // Listen for incoming payment notifications via LiveKit
+    useEffect(() => {
+        if (incomingPayment) {
+            try {
+                const data = JSON.parse(new TextDecoder().decode(incomingPayment.payload));
+                // Only show if this payment is addressed to me
+                if (data.to === address) {
+                    setPaymentNotif({ from: data.from, amount: data.amount });
+                    setTimeout(() => setPaymentNotif(null), 6000);
+                }
+            } catch (e) { console.error(e); }
+        }
+    }, [incomingPayment, address]);
 
     return (
         <div className="flex flex-col flex-1 relative overflow-hidden">
 
             {/* ── Header Overlay ── */}
             <div className="absolute top-4 left-6 z-20 flex items-center gap-4">
+                {/* Username + shield badge */}
                 <div className="flex items-center gap-2 px-3 py-1.5 bg-black/40 backdrop-blur-md rounded-lg border border-white/5 shadow-xl">
                     <div className="w-5 h-5 relative">
                         <Image src="/assets/logos/logo.png" alt="Room" fill className="object-contain" />
@@ -364,10 +400,22 @@ function RoomInterface({
                         <ShieldCheck size={14} className="text-green-500" />
                     </div>
                 </div>
+                {/* Participant count */}
                 <div className="px-3 py-1.5 bg-black/40 backdrop-blur-md rounded-lg border border-white/5 flex items-center gap-2">
                     <Users size={14} className="text-gray-400" />
                     <span className="text-[12px] font-bold text-gray-300">{participants.length}</span>
                 </div>
+                {/* Wallet STRK balance */}
+                {formattedBalance && (
+                    <div
+                        className="px-3 py-1.5 bg-yellow-500/10 backdrop-blur-md rounded-lg border border-yellow-500/20 flex items-center gap-2 cursor-pointer hover:bg-yellow-500/20 transition-colors"
+                        onClick={() => openSendUsdc()}
+                        title="Click to send STRK"
+                    >
+                        <Coins size={13} className="text-yellow-400" />
+                        <span className="text-[12px] font-bold text-yellow-300">{formattedBalance}</span>
+                    </div>
+                )}
             </div>
 
             {/* ── Raised Hands ── */}
@@ -379,6 +427,20 @@ function RoomInterface({
                             <span>{hand} raised hand</span>
                         </div>
                     ))}
+                </div>
+            )}
+
+            {/* ── Payment received banner ── */}
+            {paymentNotif && (
+                <div className="absolute top-20 right-6 z-50 animate-in slide-in-from-right duration-300 bg-yellow-500/90 text-black px-4 py-3 rounded-2xl flex items-center gap-3 shadow-2xl backdrop-blur-md border border-yellow-400">
+                    <Coins size={20} className="text-black" />
+                    <div>
+                        <p className="text-[13px] font-black">You received {paymentNotif.amount} {TOKEN_SYMBOL}!</p>
+                        <p className="text-[11px] font-bold opacity-70">from {paymentNotif.from}</p>
+                    </div>
+                    <button onClick={() => setPaymentNotif(null)} className="ml-2 opacity-60 hover:opacity-100">
+                        <X size={14} />
+                    </button>
                 </div>
             )}
 
@@ -772,8 +834,8 @@ function RoomInterface({
 
                                     {/* Send Button */}
                                     <button
-                                        onClick={handleSendUsdc}
-                                        disabled={!usdcRecipient || txStatus === "pending" || (!usdcAmount && !customAmount)}
+                                        onClick={handleSendToken}
+                                        disabled={!usdcRecipient || txStatus === "pending" || (parseFloat(customAmount || usdcAmount.toString()) < TOKEN_MIN)}
                                         className="w-full bg-yellow-500 hover:bg-yellow-400 disabled:opacity-40 disabled:hover:bg-yellow-500 text-black font-black py-4 rounded-2xl text-[14px] transition-all shadow-lg shadow-yellow-500/20 active:scale-[0.98] flex items-center justify-center gap-2"
                                     >
                                         {txStatus === "pending" ? (
@@ -784,7 +846,7 @@ function RoomInterface({
                                         ) : (
                                             <>
                                                 <Coins size={18} />
-                                                Send {customAmount || usdcAmount} USDC
+                                                Send {customAmount || usdcAmount} {TOKEN_SYMBOL}
                                                 {usdcRecipient && ` → @${usdcRecipient.name}`}
                                             </>
                                         )}
