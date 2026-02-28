@@ -11,7 +11,8 @@ import {
     ShieldCheck, Gift, Coins, Loader2, Hand, CheckCircle2, AlertCircle,
     ExternalLink, AtSign, DollarSign
 } from "lucide-react";
-import { useAccount, useBalance } from "@starknet-react/core";
+import { useAccount } from "@starknet-react/core";
+import { useStrkBalance } from "@/lib/useStrkBalance";
 import {
     LiveKitRoom,
     RoomAudioRenderer,
@@ -199,13 +200,7 @@ function RoomInterface({
 }) {
     // ── Account + Balance ──
     const { account } = useAccount();
-    const { data: balanceData } = useBalance({
-        address: address as `0x${string}`,
-        token: TOKEN_CONTRACT,
-        watch: true,
-        enabled: !!address,
-    });
-
+    const { formatted: strkFormatted, isLoading: strkLoading } = useStrkBalance(address);
 
     // ── UI State ──
     const [isHandRaised, setIsHandRaised] = useState(false);
@@ -395,10 +390,8 @@ function RoomInterface({
     // Participants available to receive token (exclude self)
     const otherParticipants = participants.filter(p => p.identity !== address);
 
-    // Formatted STRK balance for display
-    const formattedBalance = balanceData
-        ? `${parseFloat(balanceData.formatted).toFixed(2)} ${TOKEN_SYMBOL}`
-        : null;
+    // Formatted STRK balance for header display
+    const formattedBalance = strkLoading ? "…" : strkFormatted ? `${strkFormatted} ${TOKEN_SYMBOL}` : null;
 
     // Listen for incoming payment notifications via LiveKit
     useEffect(() => {

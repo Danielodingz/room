@@ -1,8 +1,9 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { useAccount, useDisconnect, useBalance } from "@starknet-react/core";
+import { useAccount, useDisconnect } from "@starknet-react/core";
 import { loadTxHistory, TxRecord } from "@/lib/txHistory";
+import { useStrkBalance } from "@/lib/useStrkBalance";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
@@ -352,19 +353,10 @@ function WalletDrawer({ isOpen, onClose }: { isOpen: boolean, onClose: () => voi
     const [copied, setCopied] = useState(false);
     const [txHistory, setTxHistory] = useState<TxRecord[]>([]);
 
-    // STRK token on Sepolia — same as room page
-    const STRK_CONTRACT = "0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d";
-    const { data: strkBalance, isLoading: balanceLoading } = useBalance({
-        address: address as `0x${string}`,
-        token: STRK_CONTRACT,
-        watch: true,          // auto-refresh every block
-        enabled: !!address,   // only fetch once address is available
-    });
+    const { formatted: strkFormatted, isLoading: balanceLoading } = useStrkBalance(address);
     const formattedBalance = balanceLoading
         ? "Loading..."
-        : strkBalance
-            ? `${parseFloat(strkBalance.formatted).toFixed(4)} STRK`
-            : "0.0000 STRK";
+        : `${strkFormatted} STRK`;
 
     // Load tx history from localStorage
     useEffect(() => {
