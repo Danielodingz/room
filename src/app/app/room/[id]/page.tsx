@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import { saveTx } from "@/lib/txHistory";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import {
@@ -332,26 +333,49 @@ function RoomInterface({
 
         try {
             setTxStatus("pending");
-            // STRK has 18 decimals — use floating point safe bigint conversion
-            const wholeUnits = Math.floor(finalAmount);
-            const fracUnits = Math.round((finalAmount - wholeUnits) * 1e9); // 9 decimal precision
-            const amountRaw = BigInt(wholeUnits) * BigInt(10 ** TOKEN_DECIMALS) + BigInt(fracUnits) * BigInt(10 ** (TOKEN_DECIMALS - 9));
+
+            // Proper Cairo uint256 encoding: split into low/high 128-bit parts
+            // TOKEN_DECIMALS = 18, so multiplier = 1_000_000_000_000_000_000n
+            const DECIMALS_FACTOR = 1_000_000_000_000_000_000n; // 10^18
+            const amountRaw = BigInt(Math.round(finalAmount * 1e9)) * (DECIMALS_FACTOR / 1_000_000_000n);
+            const U128_MAX = 340282366920938463463374607431768211456n; // 2^128
+            const low = amountRaw % U128_MAX;
+            const high = amountRaw / U128_MAX;
 
             const result = await account.execute([{
                 contractAddress: TOKEN_CONTRACT,
                 entrypoint: "transfer",
                 calldata: [
                     usdcRecipient.walletAddress,
-                    amountRaw.toString(),
-                    "0"  // uint256 high = 0 for amounts < 2^128
+                    low.toString(),
+                    high.toString()
                 ]
             }]);
-            setTxHash(result.transaction_hash);
+
+            const txHash = result.transaction_hash;
+            setTxHash(txHash);
             setTxStatus("success");
-            // Notify the recipient via LiveKit data channel
+
+            // Save to localStorage history (shows in dashboard)
+            if (address) {
+                saveTx(address, {
+                    txHash,
+                    from: userIdentifier,
+                    fromAddress: address,
+                    to: usdcRecipient.name,
+                    toAddress: usdcRecipient.walletAddress,
+                    amount: finalAmount.toString(),
+                    symbol: TOKEN_SYMBOL,
+                    timestamp: Date.now(),
+                    direction: "sent"
+                });
+            }
+
+            // Notify recipient via LiveKit data channel
             const notifPayload = JSON.stringify({
                 to: usdcRecipient.walletAddress,
                 from: userIdentifier,
+                fromAddress: address,
                 amount: finalAmount.toString()
             });
             sendPaymentNotif(new TextEncoder().encode(notifPayload), { reliable: true });
@@ -375,10 +399,24 @@ function RoomInterface({
         if (incomingPayment) {
             try {
                 const data = JSON.parse(new TextDecoder().decode(incomingPayment.payload));
-                // Only show if this payment is addressed to me
+                // Only show/save if this payment is addressed to me
                 if (data.to === address) {
                     setPaymentNotif({ from: data.from, amount: data.amount });
                     setTimeout(() => setPaymentNotif(null), 6000);
+                    // Save received tx to my history so it appears in dashboard
+                    if (address) {
+                        saveTx(address, {
+                            txHash: "",  // no hash available on recipient side
+                            from: data.from,
+                            fromAddress: data.fromAddress || "",
+                            to: userIdentifier,
+                            toAddress: address,
+                            amount: data.amount,
+                            symbol: TOKEN_SYMBOL,
+                            timestamp: Date.now(),
+                            direction: "received"
+                        });
+                    }
                 }
             } catch (e) { console.error(e); }
         }

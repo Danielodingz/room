@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { useAccount, useDisconnect } from "@starknet-react/core";
+import { useAccount, useDisconnect, useBalance } from "@starknet-react/core";
+import { loadTxHistory, TxRecord } from "@/lib/txHistory";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
@@ -349,6 +350,19 @@ function WalletDrawer({ isOpen, onClose }: { isOpen: boolean, onClose: () => voi
     const { address } = useAccount();
     const [view, setView] = useState<'home' | 'send' | 'receive'>('home');
     const [copied, setCopied] = useState(false);
+    const [txHistory, setTxHistory] = useState<TxRecord[]>([]);
+
+    // STRK token on Sepolia — same as room page
+    const STRK_CONTRACT = "0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d";
+    const { data: strkBalance } = useBalance({ address: address as `0x${string}`, token: STRK_CONTRACT });
+    const formattedBalance = strkBalance ? `${parseFloat(strkBalance.formatted).toFixed(4)} STRK` : "— STRK";
+
+    // Load tx history from localStorage
+    useEffect(() => {
+        if (address) {
+            setTxHistory(loadTxHistory(address));
+        }
+    }, [address, isOpen]); // re-load when drawer opens
 
     const handleCopy = () => {
         if (address) {
@@ -393,47 +407,29 @@ function WalletDrawer({ isOpen, onClose }: { isOpen: boolean, onClose: () => voi
                                 <h1 className="text-[40px] font-extrabold leading-[1.1] tracking-tight mb-2">Room<br />Wallet</h1>
                             </div>
 
-                            {/* Breez SDK Card */}
+                            {/* Balance Card */}
                             <div className="bg-[#1C1C1E] rounded-[32px] p-6 border border-white/5 flex flex-col gap-6 shadow-xl relative overflow-hidden group">
                                 <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                                    <DollarSign size={80} className="text-blue-500" />
+                                    <DollarSign size={80} className="text-yellow-500" />
                                 </div>
 
                                 <div className="flex items-center justify-between relative z-10">
                                     <div className="flex items-center gap-2 text-gray-500">
-                                        <div className="w-4 h-4 rounded-full bg-blue-500/20 flex items-center justify-center">
-                                            <div className="w-1.5 h-1.5 bg-blue-500 rounded-full" />
+                                        <div className="w-4 h-4 rounded-full bg-yellow-500/20 flex items-center justify-center">
+                                            <div className="w-1.5 h-1.5 bg-yellow-500 rounded-full" />
                                         </div>
-                                        <span className="text-[13px] font-medium uppercase tracking-wider text-blue-400">Starknet USDC</span>
-                                    </div>
-                                    <div className="w-5 h-5 rounded-full border border-gray-700 flex items-center justify-center">
-                                        <div className="w-2 h-2 bg-blue-500 rounded-full" />
+                                        <span className="text-[13px] font-medium uppercase tracking-wider text-yellow-400">Starknet STRK</span>
                                     </div>
                                 </div>
 
                                 <div className="flex flex-col relative z-10">
                                     <div className="flex items-baseline gap-3">
-                                        <div className="w-10 h-10 relative">
-                                            <Image
-                                                src="/assets/images/usdc.png"
-                                                alt="USDC"
-                                                fill
-                                                className="object-contain"
-                                            />
-                                        </div>
-                                        <span className="text-[32px] font-bold">0 usdc</span>
-                                        <span className="text-gray-500 font-bold">$0.00</span>
+                                        <span className="text-[32px] font-bold">{formattedBalance}</span>
                                     </div>
-                                    <p className="text-[13px] text-gray-400 mt-2 font-medium">Use the address below or transfer USDC to get started.</p>
+                                    <p className="text-[13px] text-gray-400 mt-2 font-medium">Your connected Argent/Braavos wallet balance.</p>
                                 </div>
 
                                 <div className="flex gap-3 relative z-10">
-                                    <button
-                                        onClick={() => setView('send')}
-                                        className="flex-1 bg-[#2775CA] hover:bg-[#1E5DA1] text-white font-black py-4 rounded-2xl transition-all shadow-lg shadow-blue-500/10 active:scale-95"
-                                    >
-                                        Send
-                                    </button>
                                     <button
                                         onClick={() => setView('receive')}
                                         className="flex-1 bg-[#2C2C2E] hover:bg-[#3A3A3C] text-white font-black py-4 rounded-2xl transition-all border border-white/5 active:scale-95"
@@ -464,14 +460,50 @@ function WalletDrawer({ isOpen, onClose }: { isOpen: boolean, onClose: () => voi
                             </div>
 
                             {/* History Section */}
-                            <div className="flex flex-col gap-6 mt-4">
-                                <h2 className="text-[20px] font-bold px-2 text-gray-300 uppercase tracking-widest text-[13px]">History</h2>
-                                <div className="flex flex-col items-center justify-center py-20 gap-4 bg-white/[0.02] rounded-[32px] border border-dashed border-white/5">
-                                    <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center shadow-inner">
-                                        <Clock size={24} className="text-gray-700" />
+                            <div className="flex flex-col gap-4 mt-4">
+                                <h2 className="font-bold text-gray-300 uppercase tracking-widest text-[13px] px-2">Transaction History</h2>
+                                {txHistory.length === 0 ? (
+                                    <div className="flex flex-col items-center justify-center py-16 gap-4 bg-white/[0.02] rounded-[32px] border border-dashed border-white/5">
+                                        <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center shadow-inner">
+                                            <Clock size={24} className="text-gray-700" />
+                                        </div>
+                                        <span className="text-gray-600 font-bold text-[15px]">No transactions yet</span>
+                                        <span className="text-gray-700 text-[12px] text-center max-w-[200px]">Send STRK to someone in a meeting to see it here</span>
                                     </div>
-                                    <span className="text-gray-600 font-bold text-[15px]">No transactions yet</span>
-                                </div>
+                                ) : (
+                                    <div className="flex flex-col gap-3">
+                                        {txHistory.map((tx, i) => (
+                                            <div key={`${tx.txHash}-${i}`} className="bg-white/[0.03] border border-white/5 rounded-2xl p-4 flex items-center gap-3 hover:bg-white/[0.05] transition-colors">
+                                                <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${tx.direction === 'sent' ? 'bg-red-500/10' : 'bg-green-500/10'}`}>
+                                                    {tx.direction === 'sent'
+                                                        ? <ArrowRight size={18} className="text-red-400" />
+                                                        : <ArrowLeft size={18} className="text-green-400" />}
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-[14px] font-bold text-white truncate">
+                                                        {tx.direction === 'sent' ? `→ @${tx.to}` : `← @${tx.from}`}
+                                                    </p>
+                                                    <p className="text-[11px] text-gray-500">{new Date(tx.timestamp).toLocaleString()}</p>
+                                                </div>
+                                                <div className="flex flex-col items-end shrink-0">
+                                                    <span className={`text-[14px] font-black ${tx.direction === 'sent' ? 'text-red-400' : 'text-green-400'}`}>
+                                                        {tx.direction === 'sent' ? '-' : '+'}{tx.amount} {tx.symbol}
+                                                    </span>
+                                                    {tx.txHash && (
+                                                        <a
+                                                            href={`https://sepolia.voyager.online/tx/${tx.txHash}`}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="text-[10px] text-blue-400 hover:text-blue-300"
+                                                        >
+                                                            View ↗
+                                                        </a>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )}
