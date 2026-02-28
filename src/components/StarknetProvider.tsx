@@ -4,7 +4,7 @@ import React from "react";
 import { sepolia } from "@starknet-react/chains";
 import {
     StarknetConfig,
-    publicProvider,
+    jsonRpcProvider,
     argent,
     braavos,
     useInjectedConnectors,
@@ -31,10 +31,15 @@ export function StarknetProvider({ children }: { children: React.ReactNode }) {
         new WebWalletConnector({ url: "https://web.argent.xyz" })
     ];
 
+    // Use official Starknet Foundation Sepolia RPC (publicProvider's Blast API is defunct)
+    const provider = jsonRpcProvider({
+        rpc: () => ({ nodeUrl: "https://starknet-sepolia.g.alchemy.com/starknet/version/rpc/v0_8/demo" })
+    });
+
     return (
         <StarknetConfig
             chains={[sepolia]}
-            provider={publicProvider()}
+            provider={provider}
             connectors={allConnectors}
             explorer={voyager}
         >

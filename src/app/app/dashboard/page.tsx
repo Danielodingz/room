@@ -487,16 +487,22 @@ function WalletDrawer({ isOpen, onClose }: { isOpen: boolean, onClose: () => voi
                                 </div>
                             </div>
 
-                            {/* Earnings Section */}
+                            {/* Payments Received Section */}
                             <div className="bg-[#1C1C1E] rounded-[32px] p-6 border border-white/5 flex flex-col gap-4 shadow-lg">
-                                <span className="text-[15px] font-bold text-gray-400">Earnings (Received)</span>
+                                <div className="flex items-center justify-between">
+                                    <span className="text-[15px] font-bold text-gray-400">Payments Received</span>
+                                    <span className="text-gray-500 font-bold text-[13px]">{txHistory.filter(t => t.direction === "received").length} payments</span>
+                                </div>
                                 <div className="flex items-center justify-between">
                                     <span className="text-[20px] font-bold text-green-400">
                                         +{txHistory.filter(t => t.direction === "received").reduce((sum, t) => sum + parseFloat(t.amount), 0).toFixed(4)} STRK
                                     </span>
-                                    <span className="text-gray-500 font-bold text-[13px]">{txHistory.filter(t => t.direction === "received").length} payments</span>
                                 </div>
-                                <span className="text-[12px] text-gray-600 font-medium">All time on Room</span>
+                                <div className="bg-green-500/5 border border-green-500/10 rounded-xl px-4 py-3">
+                                    <p className="text-[12px] text-green-300/70 font-medium leading-relaxed">
+                                        ✅ <strong>Already in your Argent wallet.</strong> Room is non-custodial — all STRK sent to you goes directly on-chain to your connected wallet address. No withdrawal needed.
+                                    </p>
+                                </div>
                             </div>
 
                             {/* History Section */}
