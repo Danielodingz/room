@@ -1,13 +1,14 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import {
     Mic, MicOff, Video, VideoOff, Users, MessageSquare, Smile,
     ScreenShare, MoreHorizontal, PhoneOff, Maximize2,
     ChevronUp, X, MessageCircle, Paperclip, SmilePlus, Send,
-    ShieldCheck, Gift, Coins, Loader2, Hand
+    ShieldCheck, Gift, Coins, Loader2, Hand, CheckCircle2, AlertCircle,
+    ExternalLink, AtSign, DollarSign
 } from "lucide-react";
 import { useAccount } from "@starknet-react/core";
 import {
@@ -29,6 +30,10 @@ import {
 } from "@livekit/components-react";
 import { Track, ConnectionState, Participant, LocalParticipant } from "livekit-client";
 import PreJoinScreen from "@/components/PreJoinScreen";
+
+// Starknet USDC contract on Mainnet
+const USDC_CONTRACT = "0x053c91253bc9682c04929ca02ed00b3e423f6710d2ee7e0d5ebb06f3ecf368a8";
+const USDC_DECIMALS = 6;
 
 export default function MeetingRoomPage() {
     const params = useParams();
@@ -60,12 +65,10 @@ export default function MeetingRoomPage() {
             if (!address || !preJoinComplete) return;
             try {
                 setIsConnecting(true);
-                // Fallback timeout to prevent infinite hanging if NextJS dev server freezes
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), 15000);
 
                 if (mode === "create") {
-                    // Host Mode: Create the room
                     const createRes = await fetch("/api/room/create", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
@@ -79,12 +82,10 @@ export default function MeetingRoomPage() {
                         setLiveKitUrl(data.livekitUrl);
                     } else {
                         const createErrorData = await createRes.text();
-                        console.error("Create API Failed:", createRes.status, createErrorData);
                         setConnectionError(`Host creation failed: ${createRes.status} - ${createErrorData}`);
                     }
                     clearTimeout(timeoutId);
                 } else {
-                    // Guest Mode (or direct URL link): Join the room
                     const res = await fetch("/api/room/join", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
@@ -98,13 +99,11 @@ export default function MeetingRoomPage() {
                         setLiveKitUrl(data.livekitUrl);
                     } else {
                         const joinErrorData = await res.text();
-                        console.error("Join API Failed:", res.status, joinErrorData);
                         setConnectionError(`Failed to join room: ${res.status} - ${joinErrorData}`);
                     }
                     clearTimeout(timeoutId);
                 }
             } catch (error: any) {
-                console.error("Failed to connect:", error);
                 setConnectionError(error.message || "Network error occurred.");
             } finally {
                 setIsConnecting(false);
@@ -157,7 +156,6 @@ export default function MeetingRoomPage() {
         );
     }
 
-    // Determine initial role for render optimization
     const isHostMode = mode === "create";
 
     return (
@@ -181,7 +179,7 @@ export default function MeetingRoomPage() {
     );
 }
 
-// Extracted internal UI component to safely use LiveKit hooks inside the Room Context
+// ─── Room Interface ────────────────────────────────────────────────────────────
 function RoomInterface({
     meetingId,
     address,
@@ -195,105 +193,60 @@ function RoomInterface({
     onLeave: () => void,
     isInitialHost: boolean
 }) {
-    const [currentTime, setCurrentTime] = useState(new Date());
+    // ── Account (needed for USDC send) ──
+    const { account } = useAccount();
+
+    // ── UI State ──
     const [isHandRaised, setIsHandRaised] = useState(false);
     const [raisedHands, setRaisedHands] = useState<string[]>([]);
     const [isChatOpen, setIsChatOpen] = useState(true);
-    const [isGiftingOpen, setIsGiftingOpen] = useState(false);
-    const [giftAmount, setGiftAmount] = useState(5);
     const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
     const [chatInput, setChatInput] = useState("");
     const [activeReaction, setActiveReaction] = useState<{ emoji: string, from: string } | null>(null);
 
-    // Pinning State
-    const [focusedTrack, setFocusedTrack] = useState<TrackReferenceOrPlaceholder | null>(null);
+    // ── USDC Send State ──
+    const [isSendUsdcOpen, setIsSendUsdcOpen] = useState(false);
+    const [usdcRecipient, setUsdcRecipient] = useState<{ name: string, walletAddress: string } | null>(null);
+    const [usdcAmount, setUsdcAmount] = useState(5);
+    const [customAmount, setCustomAmount] = useState("");
+    const [txStatus, setTxStatus] = useState<"idle" | "pending" | "success" | "error">("idle");
+    const [txHash, setTxHash] = useState("");
+    const [txError, setTxError] = useState("");
 
-    const handlePin = (e: any) => {
-        // Toggle off if clicking the already focused person
-        if (focusedTrack && focusedTrack.participant.identity === e.participant.identity) {
-            setFocusedTrack(null);
-            return;
-        }
-
-        // Pin the selected person, structurally typing a TrackReference
-        if (e.participant) {
-            setFocusedTrack({
-                participant: e.participant,
-                publication: e.track,
-                source: e.track?.source || Track.Source.Camera
-            });
-        }
-    };
-
-    // LiveKit Hooks (Must be within LiveKitRoom)
+    // ── LiveKit Hooks ──
     const { localParticipant, isMicrophoneEnabled, isCameraEnabled, isScreenShareEnabled } = useLocalParticipant();
     const { send: sendChatMessage, chatMessages, isSending } = useChat();
     const { send: sendReactionData, message: incomingReaction } = useDataChannel("reactions");
     const { send: sendHandUpdate, message: handMessage } = useDataChannel("hands");
-    const connectionState = useConnectionState();
-    const participants = useParticipants(); // Added useParticipants
+    const participants = useParticipants();
 
-    // Determine Role from Metadata
     const role = localParticipant?.metadata ? JSON.parse(localParticipant.metadata).role : "participant";
     const isHost = role === "host";
 
-    const handleEndMeetingGlobally = async () => {
-        try {
-            const res = await fetch("/api/room/end", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ roomId: meetingId, walletAddress: address })
-            });
-            if (res.ok) {
-                // Instantly force local client to disconnect and redirect
-                onLeave();
-            } else {
-                console.error("Failed to end meeting", await res.text());
-                onLeave(); // fallback leave just in case
-            }
-        } catch (err) {
-            console.error("Error ending meeting:", err);
-            onLeave();
-        }
-    }
+    const shortenedAddress = address ? `${address.slice(0, 6)}...${address.slice(-4)}` : "Guest";
+    const userIdentifier = displayName || shortenedAddress;
 
-    // LiveKit Track Hooks for rendering grid layout.
-    // onlySubscribed: false + withPlaceholder: true ensures EVERY connected
-    // participant always has a visible tile, even before camera subscription
-    // completes — just like Google Meet where you always see all participants.
+    // ── Tracks ──
     const tracks = useTracks(
-        [
-            { source: Track.Source.Camera, withPlaceholder: true },
-        ],
+        [{ source: Track.Source.Camera, withPlaceholder: true }],
         { onlySubscribed: false },
     );
-
     const screenShareTracks = useTracks(
         [{ source: Track.Source.ScreenShare, withPlaceholder: false }],
         { onlySubscribed: false },
     );
     const hasScreenShare = screenShareTracks.length > 0;
 
-    useEffect(() => {
-        const timer = setInterval(() => setCurrentTime(new Date()), 1000);
-        return () => clearInterval(timer);
-    }, []);
-
-    // Reactions effect
+    // ── Reactions ──
     useEffect(() => {
         if (incomingReaction) {
             try {
                 const data = JSON.parse(new TextDecoder().decode(incomingReaction.payload));
                 setActiveReaction(data);
                 setTimeout(() => setActiveReaction(null), 3000);
-            } catch (e) {
-                console.error(e);
-            }
+            } catch (e) { console.error(e); }
         }
     }, [incomingReaction]);
-
-    const shortenedAddress = address ? `${address.slice(0, 6)}...${address.slice(-4)}` : "Guest";
-    const userIdentifier = displayName || shortenedAddress;
 
     const handleSendReaction = (emoji: string) => {
         const payload = JSON.stringify({ emoji, from: userIdentifier });
@@ -303,6 +256,7 @@ function RoomInterface({
         setIsEmojiPickerOpen(false);
     };
 
+    // ── Hand Raise ──
     useEffect(() => {
         if (handMessage) {
             try {
@@ -312,9 +266,7 @@ function RoomInterface({
                 } else {
                     setRaisedHands(prev => prev.filter(id => id !== data.from));
                 }
-            } catch (e) {
-                console.error(e);
-            }
+            } catch (e) { console.error(e); }
         }
     }, [handMessage]);
 
@@ -323,7 +275,6 @@ function RoomInterface({
         setIsHandRaised(newState);
         const payload = JSON.stringify({ isRaised: newState, from: userIdentifier });
         sendHandUpdate(new TextEncoder().encode(payload), { reliable: true });
-
         if (newState) {
             setRaisedHands(prev => !prev.includes("You") ? [...prev, "You"] : prev);
         } else {
@@ -331,6 +282,7 @@ function RoomInterface({
         }
     };
 
+    // ── Chat ──
     const handleSendMessage = () => {
         if (chatInput.trim()) {
             sendChatMessage(chatInput.trim());
@@ -338,15 +290,68 @@ function RoomInterface({
         }
     };
 
+    // ── End Meeting ──
+    const handleEndMeetingGlobally = async () => {
+        try {
+            const res = await fetch("/api/room/end", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ roomId: meetingId, walletAddress: address })
+            });
+            onLeave();
+        } catch (err) {
+            onLeave();
+        }
+    };
+
+    // ── Media controls ──
     const toggleMic = () => localParticipant.setMicrophoneEnabled(!isMicrophoneEnabled);
     const toggleVideo = () => localParticipant.setCameraEnabled(!isCameraEnabled);
     const toggleScreenShare = () => localParticipant.setScreenShareEnabled(!isScreenShareEnabled);
 
+    // ── USDC Send ──
+    const openSendUsdc = (recipient?: { name: string, walletAddress: string }) => {
+        setUsdcRecipient(recipient || null);
+        setTxStatus("idle");
+        setTxHash("");
+        setTxError("");
+        setIsSendUsdcOpen(true);
+    };
 
+    const handleSendUsdc = async () => {
+        if (!account || !usdcRecipient) return;
+        const finalAmount = customAmount ? parseInt(customAmount) : usdcAmount;
+        if (!finalAmount || finalAmount <= 0) return;
+
+        try {
+            setTxStatus("pending");
+            // USDC has 6 decimals: 5 USDC = 5_000_000
+            const amountRaw = BigInt(finalAmount) * BigInt(10 ** USDC_DECIMALS);
+            const result = await account.execute([{
+                contractAddress: USDC_CONTRACT,
+                entrypoint: "transfer",
+                calldata: [
+                    usdcRecipient.walletAddress,
+                    amountRaw.toString(),
+                    "0"  // uint256 high bits = 0 for small amounts
+                ]
+            }]);
+            setTxHash(result.transaction_hash);
+            setTxStatus("success");
+        } catch (err: any) {
+            console.error("USDC send error:", err);
+            setTxError(err?.message || "Transaction failed");
+            setTxStatus("error");
+        }
+    };
+
+    // Participants available to receive USDC (exclude self)
+    const otherParticipants = participants.filter(p => p.identity !== address);
 
     return (
         <div className="flex flex-col flex-1 relative overflow-hidden">
-            {/* Header / Branding Overlay */}
+
+            {/* ── Header Overlay ── */}
             <div className="absolute top-4 left-6 z-20 flex items-center gap-4">
                 <div className="flex items-center gap-2 px-3 py-1.5 bg-black/40 backdrop-blur-md rounded-lg border border-white/5 shadow-xl">
                     <div className="w-5 h-5 relative">
@@ -358,14 +363,13 @@ function RoomInterface({
                         <ShieldCheck size={14} className="text-green-500" />
                     </div>
                 </div>
-
                 <div className="px-3 py-1.5 bg-black/40 backdrop-blur-md rounded-lg border border-white/5 flex items-center gap-2">
                     <Users size={14} className="text-gray-400" />
                     <span className="text-[12px] font-bold text-gray-300">{participants.length}</span>
                 </div>
             </div>
 
-            {/* Raised Hands Status Overlay */}
+            {/* ── Raised Hands ── */}
             {raisedHands.length > 0 && (
                 <div className="absolute top-20 left-6 z-20 flex flex-col gap-2">
                     {raisedHands.map((hand, idx) => (
@@ -377,14 +381,14 @@ function RoomInterface({
                 </div>
             )}
 
-            {/* Top Right Controls */}
+            {/* ── Top Right Controls ── */}
             <div className="absolute top-4 right-6 z-20 flex items-center gap-2">
                 <button className="p-2 bg-black/40 backdrop-blur-md rounded-lg border border-white/5 hover:bg-white/5 transition-colors text-gray-400 hover:text-white">
                     <Maximize2 size={18} />
                 </button>
             </div>
 
-            {/* Reaction Overlay */}
+            {/* ── Reaction Overlay (floating above the content) ── */}
             {activeReaction && (
                 <div className="absolute top-32 left-1/2 -translate-x-1/2 z-50 animate-bounce flex items-center gap-3 bg-black/60 px-5 py-3 rounded-full backdrop-blur-md border border-white/10 shadow-2xl">
                     <span className="text-4xl">{activeReaction.emoji}</span>
@@ -392,15 +396,13 @@ function RoomInterface({
                 </div>
             )}
 
-
-
-            {/* Main Layout: Video Area + Chat Sidebar */}
+            {/* ── Main Layout: Video + Chat ── */}
             <div className="flex flex-1 relative overflow-hidden">
+
                 {/* Video Grid Area */}
                 <div className="flex-1 flex flex-col relative bg-[#0F0F10] transition-all duration-300">
                     <div className="w-full h-full p-3 pt-20 pb-3 relative flex">
                         {hasScreenShare ? (
-                            /* Screen Share mode: presenter big, camera thumbnails in sidebar */
                             <FocusLayoutContainer className="w-full h-full flex flex-col md:flex-row gap-3">
                                 <div className="flex-1 h-full relative">
                                     <FocusLayout trackRef={screenShareTracks[0]} />
@@ -412,10 +414,9 @@ function RoomInterface({
                                 </div>
                             </FocusLayoutContainer>
                         ) : (
-                            /* Normal mode: equal grid for all participants */
                             <GridLayout
                                 tracks={tracks as TrackReferenceOrPlaceholder[]}
-                                style={{ height: '100%', width: '100%' }}
+                                style={{ height: "100%", width: "100%" }}
                             >
                                 <ParticipantTile />
                             </GridLayout>
@@ -423,7 +424,7 @@ function RoomInterface({
                     </div>
                 </div>
 
-                {/* Right Chat Sidebar */}
+                {/* ── Chat Sidebar ── */}
                 {isChatOpen && (
                     <div className="w-[380px] bg-[#111112] border-l border-white/5 flex flex-col animate-in slide-in-from-right duration-300 shadow-2xl relative z-30">
                         <div className="p-6 flex items-center justify-between border-b border-white/5">
@@ -434,6 +435,7 @@ function RoomInterface({
                             </div>
                         </div>
 
+                        {/* Messages */}
                         <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-4 custom-scrollbar relative">
                             {chatMessages.length === 0 ? (
                                 <div className="flex flex-col items-center justify-center py-10 opacity-40 mt-10">
@@ -447,7 +449,7 @@ function RoomInterface({
                                     <div key={msg.id} className="flex flex-col gap-1">
                                         <div className="flex items-center gap-2">
                                             <span className="text-[12px] font-bold text-gray-400">{msg.from?.name || msg.from?.identity || "Unknown"}</span>
-                                            <span className="text-[10px] text-gray-600">{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                            <span className="text-[10px] text-gray-600">{new Date(msg.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
                                         </div>
                                         <div className="bg-white/5 p-3 rounded-xl text-[14px] text-gray-200 w-fit max-w-full break-words">
                                             {msg.message}
@@ -457,28 +459,12 @@ function RoomInterface({
                             )}
                         </div>
 
-                        {/* Input Area */}
+                        {/* Chat Input */}
                         <div className="p-6 border-t border-white/5 bg-[#111112] relative">
-                            {/* Emoji Picker Popup */}
-                            {isEmojiPickerOpen && (
-                                <div className="absolute bottom-[100%] right-6 mb-2 bg-[#1C1C1E] border border-white/10 rounded-2xl p-4 flex gap-3 shadow-2xl z-50 animate-in fade-in zoom-in-95">
-                                    {['👍', '👏', '❤️', '😂', '🎉', '😮'].map(emoji => (
-                                        <button
-                                            key={emoji}
-                                            onClick={() => handleSendReaction(emoji)}
-                                            className="text-2xl hover:bg-white/10 hover:scale-125 transition-all p-2 rounded-xl"
-                                        >
-                                            {emoji}
-                                        </button>
-                                    ))}
-                                </div>
-                            )}
-
                             <div className="flex items-center gap-2 mb-3 px-1">
                                 <span className="text-[12px] font-bold text-gray-500 uppercase tracking-widest">To:</span>
                                 <button className="flex items-center gap-1.5 px-3 py-1 bg-blue-500/10 border border-blue-500/20 rounded-lg text-blue-400 text-[12px] font-bold">
-                                    Everyone
-                                    <ChevronUp size={12} />
+                                    Everyone <ChevronUp size={12} />
                                 </button>
                             </div>
 
@@ -487,7 +473,7 @@ function RoomInterface({
                                     value={chatInput}
                                     onChange={(e) => setChatInput(e.target.value)}
                                     onKeyDown={(e) => {
-                                        if (e.key === 'Enter' && !e.shiftKey) {
+                                        if (e.key === "Enter" && !e.shiftKey) {
                                             e.preventDefault();
                                             handleSendMessage();
                                         }
@@ -499,9 +485,11 @@ function RoomInterface({
                                     <div className="flex items-center gap-1">
                                         <button className="p-2 hover:bg-white/5 rounded-lg text-gray-400"><Paperclip size={18} /></button>
                                         <button className="p-2 hover:bg-white/5 rounded-lg text-gray-400"><SmilePlus size={18} /></button>
+                                        {/* Gift/Send USDC button */}
                                         <button
-                                            onClick={() => setIsGiftingOpen(!isGiftingOpen)}
-                                            className={`p-2 rounded-lg transition-all ${isGiftingOpen ? 'bg-yellow-500/20 text-yellow-500' : 'hover:bg-white/5 text-gray-400 hover:text-yellow-500'}`}
+                                            onClick={() => openSendUsdc()}
+                                            className="p-2 hover:bg-yellow-500/10 rounded-lg text-gray-400 hover:text-yellow-400 transition-all"
+                                            title="Send USDC"
                                         >
                                             <Gift size={18} />
                                         </button>
@@ -516,43 +504,6 @@ function RoomInterface({
                                 </div>
                             </div>
 
-                            {/* Gifting Selection Area */}
-                            {isGiftingOpen && (
-                                <div className="mt-4 bg-yellow-500/5 border border-yellow-500/20 rounded-2xl p-4 animate-in slide-in-from-bottom-2 duration-300">
-                                    <div className="flex items-center justify-between mb-4">
-                                        <div className="flex items-center gap-2">
-                                            <div className="w-6 h-6 bg-yellow-500 rounded-full flex items-center justify-center">
-                                                <Coins size={14} className="text-black" />
-                                            </div>
-                                            <span className="text-[12px] font-bold text-yellow-500 uppercase tracking-widest">Send Coins</span>
-                                        </div>
-                                        <button onClick={() => setIsGiftingOpen(false)} className="text-gray-500 hover:text-white"><X size={14} /></button>
-                                    </div>
-
-                                    <div className="grid grid-cols-4 gap-2 mb-4">
-                                        {[5, 10, 20, 50].map((amount) => (
-                                            <button
-                                                key={amount}
-                                                onClick={() => setGiftAmount(amount)}
-                                                className={`py-2 rounded-xl text-[12px] font-bold transition-all border ${giftAmount === amount
-                                                    ? 'bg-yellow-500 text-black border-yellow-500'
-                                                    : 'bg-white/5 text-gray-400 border-white/10 hover:border-yellow-500/50'
-                                                    }`}
-                                            >
-                                                {amount}
-                                            </button>
-                                        ))}
-                                    </div>
-
-                                    <button
-                                        onClick={() => setIsGiftingOpen(false)}
-                                        className="w-full bg-yellow-500 hover:bg-yellow-600 text-black font-black py-2.5 rounded-xl text-[13px] transition-all shadow-lg shadow-yellow-500/20 active:scale-95"
-                                    >
-                                        Send {giftAmount} Coins
-                                    </button>
-                                </div>
-                            )}
-
                             <div className="mt-2 flex items-center justify-center gap-2 py-1">
                                 <Users size={12} className="text-gray-600" />
                                 <span className="text-[11px] font-bold text-gray-600">Who can see your messages?</span>
@@ -562,9 +513,10 @@ function RoomInterface({
                 )}
             </div>
 
-            {/* Bottom Toolbar Controls */}
+            {/* ── Bottom Toolbar ── */}
             <div className="h-[96px] bg-[#0A0A0B]/80 backdrop-blur-xl border-t border-white/5 px-8 flex items-center justify-between z-40 relative shadow-[0_-20px_40px_-5px_rgba(0,0,0,0.4)]">
-                {/* Left: Meeting Settings */}
+
+                {/* Left: Mic + Camera */}
                 <div className="flex items-center gap-2 min-w-[120px]">
                     <div className="flex flex-col group p-1">
                         <ControlButton
@@ -594,6 +546,8 @@ function RoomInterface({
                         active={isChatOpen}
                         onClick={() => setIsChatOpen(!isChatOpen)}
                     />
+
+                    {/* ── Reactions Button with floating popup ── */}
                     <div className="relative">
                         <ControlButton
                             icon={<Smile />}
@@ -602,7 +556,22 @@ function RoomInterface({
                             onClick={() => setIsEmojiPickerOpen(!isEmojiPickerOpen)}
                             hasArrow
                         />
+                        {/* Floating emoji popup — works WITHOUT chat being open */}
+                        {isEmojiPickerOpen && (
+                            <div className="absolute bottom-[calc(100%+12px)] left-1/2 -translate-x-1/2 bg-[#1C1C1E] border border-white/10 rounded-2xl p-3 flex gap-2 shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-150">
+                                {["👍", "👏", "❤️", "😂", "🎉", "😮", "🔥", "🤩"].map(emoji => (
+                                    <button
+                                        key={emoji}
+                                        onClick={() => handleSendReaction(emoji)}
+                                        className="text-2xl hover:bg-white/10 hover:scale-125 transition-all p-2 rounded-xl"
+                                    >
+                                        {emoji}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
                     </div>
+
                     <ControlButton
                         icon={<Hand className={isHandRaised ? "text-yellow-500" : ""} />}
                         label="Raise"
@@ -610,6 +579,16 @@ function RoomInterface({
                         onClick={toggleHand}
                     />
                     <div className="w-px h-8 bg-white/5 mx-2" />
+
+                    {/* ── Send USDC Button ── */}
+                    <div className="relative">
+                        <ControlButton
+                            icon={<Coins className="text-yellow-400" />}
+                            label="Send USDC"
+                            onClick={() => openSendUsdc()}
+                        />
+                    </div>
+
                     <ControlButton
                         icon={<ScreenShare className={isScreenShareEnabled ? "text-red-500 animate-pulse" : "text-green-500"} />}
                         label={isScreenShareEnabled ? "Stop Sharing" : "Share Screen"}
@@ -619,7 +598,7 @@ function RoomInterface({
                     <ControlButton icon={<MoreHorizontal />} label="More" />
                 </div>
 
-                {/* Right: End Meeting */}
+                {/* Right: End / Leave */}
                 <div className="min-w-[120px] flex justify-end gap-2">
                     {isHost && (
                         <button
@@ -641,10 +620,192 @@ function RoomInterface({
                     </button>
                 </div>
             </div>
+
+            {/* ── Send USDC Modal ── */}
+            {isSendUsdcOpen && (
+                <div
+                    className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200"
+                    onClick={(e) => { if (e.target === e.currentTarget) { setIsSendUsdcOpen(false); } }}
+                >
+                    <div className="bg-[#111112] border border-white/10 rounded-3xl w-full max-w-[440px] shadow-2xl animate-in zoom-in-95 duration-200 overflow-hidden">
+
+                        {/* Modal Header */}
+                        <div className="flex items-center justify-between p-6 border-b border-white/5">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 bg-yellow-500/10 rounded-xl flex items-center justify-center">
+                                    <Coins size={20} className="text-yellow-400" />
+                                </div>
+                                <div>
+                                    <h2 className="text-[17px] font-bold">Send USDC</h2>
+                                    <p className="text-[12px] text-gray-500">Starknet · instant transfer</p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => setIsSendUsdcOpen(false)}
+                                className="p-2 hover:bg-white/5 rounded-xl text-gray-400 hover:text-white transition-colors"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+
+                        <div className="p-6 flex flex-col gap-6">
+
+                            {txStatus === "success" ? (
+                                /* Success state */
+                                <div className="flex flex-col items-center gap-4 py-4">
+                                    <div className="w-16 h-16 bg-green-500/10 rounded-full flex items-center justify-center">
+                                        <CheckCircle2 size={32} className="text-green-400" />
+                                    </div>
+                                    <div className="text-center">
+                                        <p className="text-[16px] font-bold text-green-400">Sent!</p>
+                                        <p className="text-[13px] text-gray-400 mt-1">
+                                            {customAmount || usdcAmount} USDC → @{usdcRecipient?.name}
+                                        </p>
+                                    </div>
+                                    {txHash && (
+                                        <a
+                                            href={`https://voyager.online/tx/${txHash}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="flex items-center gap-2 text-[12px] text-blue-400 hover:text-blue-300 transition-colors"
+                                        >
+                                            View on Voyager <ExternalLink size={12} />
+                                        </a>
+                                    )}
+                                    <button
+                                        onClick={() => { setTxStatus("idle"); setUsdcRecipient(null); setCustomAmount(""); }}
+                                        className="px-6 py-2.5 bg-white/5 rounded-xl text-[13px] font-bold hover:bg-white/10 transition-colors"
+                                    >
+                                        Send Again
+                                    </button>
+                                </div>
+                            ) : txStatus === "error" ? (
+                                /* Error state */
+                                <div className="flex flex-col items-center gap-4 py-4">
+                                    <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center">
+                                        <AlertCircle size={32} className="text-red-400" />
+                                    </div>
+                                    <div className="text-center">
+                                        <p className="text-[16px] font-bold text-red-400">Transaction Failed</p>
+                                        <p className="text-[12px] text-gray-500 mt-1 max-w-[280px] break-words">{txError}</p>
+                                    </div>
+                                    <button
+                                        onClick={() => setTxStatus("idle")}
+                                        className="px-6 py-2.5 bg-white/5 rounded-xl text-[13px] font-bold hover:bg-white/10 transition-colors"
+                                    >
+                                        Try Again
+                                    </button>
+                                </div>
+                            ) : (
+                                /* Normal send form */
+                                <>
+                                    {/* Step 1: Pick recipient */}
+                                    <div>
+                                        <p className="text-[11px] font-bold uppercase tracking-widest text-gray-500 mb-3 flex items-center gap-2">
+                                            <AtSign size={12} /> Recipients
+                                        </p>
+                                        {otherParticipants.length === 0 ? (
+                                            <div className="text-[13px] text-gray-500 text-center py-4 bg-white/[0.02] rounded-2xl border border-white/5">
+                                                No other participants in the room
+                                            </div>
+                                        ) : (
+                                            <div className="flex flex-col gap-2">
+                                                {otherParticipants.map((p) => {
+                                                    const name = p.name || `${p.identity.slice(0, 6)}...${p.identity.slice(-4)}`;
+                                                    const isSelected = usdcRecipient?.walletAddress === p.identity;
+                                                    return (
+                                                        <button
+                                                            key={p.identity}
+                                                            onClick={() => setUsdcRecipient({ name, walletAddress: p.identity })}
+                                                            className={`flex items-center gap-3 p-3.5 rounded-2xl border transition-all text-left ${isSelected
+                                                                    ? "bg-yellow-500/10 border-yellow-500/40 text-yellow-300"
+                                                                    : "bg-white/[0.02] border-white/5 hover:bg-white/5 hover:border-white/10"
+                                                                }`}
+                                                        >
+                                                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-[13px] font-bold ${isSelected ? "bg-yellow-500/20 text-yellow-300" : "bg-white/10 text-gray-300"}`}>
+                                                                {name.charAt(0).toUpperCase()}
+                                                            </div>
+                                                            <div className="flex flex-col">
+                                                                <span className="text-[14px] font-bold">@{name}</span>
+                                                                <span className="text-[11px] text-gray-500 font-mono">
+                                                                    {p.identity.slice(0, 10)}...{p.identity.slice(-6)}
+                                                                </span>
+                                                            </div>
+                                                            {isSelected && (
+                                                                <CheckCircle2 size={16} className="ml-auto text-yellow-400" />
+                                                            )}
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Step 2: Pick amount */}
+                                    <div>
+                                        <p className="text-[11px] font-bold uppercase tracking-widest text-gray-500 mb-3 flex items-center gap-2">
+                                            <DollarSign size={12} /> Amount (USDC)
+                                        </p>
+                                        <div className="grid grid-cols-4 gap-2 mb-3">
+                                            {[5, 10, 25, 50].map((amt) => (
+                                                <button
+                                                    key={amt}
+                                                    onClick={() => { setUsdcAmount(amt); setCustomAmount(""); }}
+                                                    className={`py-2.5 rounded-xl text-[13px] font-bold transition-all border ${usdcAmount === amt && !customAmount
+                                                            ? "bg-yellow-500 text-black border-yellow-500 shadow-lg shadow-yellow-500/20"
+                                                            : "bg-white/5 text-gray-300 border-white/10 hover:border-yellow-500/40"
+                                                        }`}
+                                                >
+                                                    {amt}
+                                                </button>
+                                            ))}
+                                        </div>
+                                        <input
+                                            type="number"
+                                            placeholder="Custom amount..."
+                                            value={customAmount}
+                                            onChange={(e) => setCustomAmount(e.target.value)}
+                                            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-[14px] text-white placeholder:text-gray-600 focus:outline-none focus:border-yellow-500/50 transition-colors"
+                                        />
+                                    </div>
+
+                                    {/* Send Button */}
+                                    <button
+                                        onClick={handleSendUsdc}
+                                        disabled={!usdcRecipient || txStatus === "pending" || (!usdcAmount && !customAmount)}
+                                        className="w-full bg-yellow-500 hover:bg-yellow-400 disabled:opacity-40 disabled:hover:bg-yellow-500 text-black font-black py-4 rounded-2xl text-[14px] transition-all shadow-lg shadow-yellow-500/20 active:scale-[0.98] flex items-center justify-center gap-2"
+                                    >
+                                        {txStatus === "pending" ? (
+                                            <>
+                                                <Loader2 size={18} className="animate-spin" />
+                                                Sending...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Coins size={18} />
+                                                Send {customAmount || usdcAmount} USDC
+                                                {usdcRecipient && ` → @${usdcRecipient.name}`}
+                                            </>
+                                        )}
+                                    </button>
+
+                                    {!account && (
+                                        <p className="text-center text-[12px] text-red-400">
+                                            Wallet not connected — cannot send
+                                        </p>
+                                    )}
+                                </>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
         </div>
     );
 }
 
+// ─── Control Button ────────────────────────────────────────────────────────────
 function ControlButton({
     icon,
     label,
@@ -665,7 +826,7 @@ function ControlButton({
             <button
                 onClick={onClick}
                 className={`w-[44px] h-[44px] md:w-[52px] md:h-[52px] flex items-center justify-center rounded-xl transition-all relative
-                ${active ? 'bg-blue-500/20 text-blue-400' : 'hover:bg-white/5 text-gray-400 hover:text-white active:scale-95'}`}
+                ${active ? "bg-blue-500/20 text-blue-400" : "hover:bg-white/5 text-gray-400 hover:text-white active:scale-95"}`}
             >
                 {React.cloneElement(icon as React.ReactElement, { size: 24 })}
                 {hasArrow && (
@@ -680,7 +841,7 @@ function ControlButton({
                 )}
             </button>
             <span className={`text-[10px] font-bold uppercase tracking-wider text-center transition-colors
-                ${active ? 'text-blue-400' : 'text-gray-500 group-hover:text-gray-300'}`}>
+                ${active ? "text-blue-400" : "text-gray-500 group-hover:text-gray-300"}`}>
                 {label}
             </span>
         </div>
