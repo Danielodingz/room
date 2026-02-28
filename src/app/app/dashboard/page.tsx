@@ -449,26 +449,37 @@ function WalletDrawer({ isOpen, onClose }: { isOpen: boolean, onClose: () => voi
                                 <h1 className="text-[40px] font-extrabold leading-[1.1] tracking-tight mb-2">Room<br />Wallet</h1>
                             </div>
 
-                            {/* Balance Card */}
+                            {/* Room Wallet Balance Card */}
                             <div className="bg-[#1C1C1E] rounded-[32px] p-6 border border-white/5 flex flex-col gap-6 shadow-xl relative overflow-hidden group">
                                 <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
                                     <DollarSign size={80} className="text-yellow-500" />
                                 </div>
 
                                 <div className="flex items-center justify-between relative z-10">
-                                    <div className="flex items-center gap-2 text-gray-500">
+                                    <div className="flex items-center gap-2">
                                         <div className="w-4 h-4 rounded-full bg-yellow-500/20 flex items-center justify-center">
                                             <div className="w-1.5 h-1.5 bg-yellow-500 rounded-full" />
                                         </div>
-                                        <span className="text-[13px] font-medium uppercase tracking-wider text-yellow-400">Starknet STRK</span>
+                                        <span className="text-[13px] font-medium uppercase tracking-wider text-yellow-400">Room Wallet</span>
                                     </div>
+                                    <span className="text-[11px] text-gray-600 uppercase tracking-wider">STRK</span>
                                 </div>
 
-                                <div className="flex flex-col relative z-10">
+                                {/* Main balance = total received via Room */}
+                                <div className="flex flex-col relative z-10 gap-1">
                                     <div className="flex items-baseline gap-3">
-                                        <span className="text-[32px] font-bold">{formattedBalance}</span>
+                                        <span className="text-[36px] font-black">
+                                            {txHistory.filter(t => t.direction === "received").reduce((sum, t) => sum + parseFloat(t.amount), 0).toFixed(4)}
+                                        </span>
+                                        <span className="text-yellow-400 font-bold">STRK</span>
                                     </div>
-                                    <p className="text-[13px] text-gray-400 mt-2 font-medium">Your connected Argent/Braavos wallet balance.</p>
+                                    <p className="text-[12px] text-gray-500">
+                                        {txHistory.filter(t => t.direction === "received").length} payments received via Room
+                                    </p>
+                                    {/* Argent wallet balance shown as secondary */}
+                                    <p className="text-[12px] text-gray-600 mt-1">
+                                        Argent wallet: {balanceLoading ? "Loading..." : `${strkFormatted} STRK`}
+                                    </p>
                                 </div>
 
                                 <div className="flex gap-3 relative z-10">
@@ -482,26 +493,8 @@ function WalletDrawer({ isOpen, onClose }: { isOpen: boolean, onClose: () => voi
                                         onClick={() => setView('receive')}
                                         className="flex-1 bg-[#2C2C2E] hover:bg-[#3A3A3C] text-white font-black py-4 rounded-2xl transition-all border border-white/5 active:scale-95"
                                     >
-                                        Receive
+                                        Withdraw
                                     </button>
-                                </div>
-                            </div>
-
-                            {/* Payments Received Section */}
-                            <div className="bg-[#1C1C1E] rounded-[32px] p-6 border border-white/5 flex flex-col gap-4 shadow-lg">
-                                <div className="flex items-center justify-between">
-                                    <span className="text-[15px] font-bold text-gray-400">Payments Received</span>
-                                    <span className="text-gray-500 font-bold text-[13px]">{txHistory.filter(t => t.direction === "received").length} payments</span>
-                                </div>
-                                <div className="flex items-center justify-between">
-                                    <span className="text-[20px] font-bold text-green-400">
-                                        +{txHistory.filter(t => t.direction === "received").reduce((sum, t) => sum + parseFloat(t.amount), 0).toFixed(4)} STRK
-                                    </span>
-                                </div>
-                                <div className="bg-green-500/5 border border-green-500/10 rounded-xl px-4 py-3">
-                                    <p className="text-[12px] text-green-300/70 font-medium leading-relaxed">
-                                        ✅ <strong>Already in your Argent wallet.</strong> Room is non-custodial — all STRK sent to you goes directly on-chain to your connected wallet address. No withdrawal needed.
-                                    </p>
                                 </div>
                             </div>
 
