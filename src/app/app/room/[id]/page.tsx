@@ -257,19 +257,20 @@ function RoomInterface({
         }
     }
 
-    // LiveKit Track Hooks for rendering grid layout
-    // onlySubscribed: true (default) ensures we only render tracks that are
-    // actually published & subscribed — this is what makes two-way video work.
+    // LiveKit Track Hooks for rendering grid layout.
+    // onlySubscribed: false + withPlaceholder: true ensures EVERY connected
+    // participant always has a visible tile, even before camera subscription
+    // completes — just like Google Meet where you always see all participants.
     const tracks = useTracks(
         [
             { source: Track.Source.Camera, withPlaceholder: true },
         ],
-        { onlySubscribed: true },
+        { onlySubscribed: false },
     );
 
     const screenShareTracks = useTracks(
         [{ source: Track.Source.ScreenShare, withPlaceholder: false }],
-        { onlySubscribed: true },
+        { onlySubscribed: false },
     );
     const hasScreenShare = screenShareTracks.length > 0;
 
