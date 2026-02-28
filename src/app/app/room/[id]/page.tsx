@@ -398,37 +398,27 @@ function RoomInterface({
             <div className="flex flex-1 relative overflow-hidden">
                 {/* Video Grid Area */}
                 <div className="flex-1 flex flex-col relative bg-[#0F0F10] transition-all duration-300">
-                    <div className="w-full h-full p-4 pt-20 pb-4 relative flex">
-                        {tracks.length > 0 ? (
-                            (hasScreenShare || focusedTrack) ? (
-                                <FocusLayoutContainer className="w-full h-full flex flex-col md:flex-row gap-4">
-                                    <div className="flex-1 h-full min-h-[60%] relative group">
-                                        <FocusLayout trackRef={hasScreenShare ? screenShareTracks[0] : focusedTrack!} />
-                                        {!hasScreenShare && (
-                                            <button
-                                                onClick={() => setFocusedTrack(null)}
-                                                className="absolute top-4 right-4 z-50 bg-black/60 p-2 rounded-full hover:bg-black/80 text-white opacity-0 group-hover:opacity-100 transition-opacity"
-                                                title="Unpin View"
-                                            >
-                                                <X size={20} />
-                                            </button>
-                                        )}
-                                    </div>
-                                    <div className="md:w-[240px] md:h-full h-[120px] w-full shrink-0">
-                                        <CarouselLayout tracks={tracks as TrackReferenceOrPlaceholder[]}>
-                                            <ParticipantTile onParticipantClick={handlePin} />
-                                        </CarouselLayout>
-                                    </div>
-                                </FocusLayoutContainer>
-                            ) : (
-                                <GridLayout tracks={tracks as TrackReferenceOrPlaceholder[]} style={{ height: '100%', width: '100%' }}>
-                                    <ParticipantTile onParticipantClick={handlePin} />
-                                </GridLayout>
-                            )
+                    <div className="w-full h-full p-3 pt-20 pb-3 relative flex">
+                        {hasScreenShare ? (
+                            /* Screen Share mode: presenter big, camera thumbnails in sidebar */
+                            <FocusLayoutContainer className="w-full h-full flex flex-col md:flex-row gap-3">
+                                <div className="flex-1 h-full relative">
+                                    <FocusLayout trackRef={screenShareTracks[0]} />
+                                </div>
+                                <div className="md:w-[220px] md:h-full h-[120px] w-full shrink-0">
+                                    <CarouselLayout tracks={tracks as TrackReferenceOrPlaceholder[]}>
+                                        <ParticipantTile />
+                                    </CarouselLayout>
+                                </div>
+                            </FocusLayoutContainer>
                         ) : (
-                            <div className="w-full h-full flex flex-col items-center justify-center text-gray-500 gap-4">
-                                <span className="text-[14px] font-medium animate-pulse">Waiting for media streams...</span>
-                            </div>
+                            /* Normal mode: equal grid for all participants */
+                            <GridLayout
+                                tracks={tracks as TrackReferenceOrPlaceholder[]}
+                                style={{ height: '100%', width: '100%' }}
+                            >
+                                <ParticipantTile />
+                            </GridLayout>
                         )}
                     </div>
                 </div>
