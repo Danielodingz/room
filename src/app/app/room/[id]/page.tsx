@@ -12,7 +12,7 @@ import {
     ExternalLink, AtSign, DollarSign
 } from "lucide-react";
 import { useAccount } from "@starknet-react/core";
-import { ROOM_VAULT_ADDRESS, toU256Calldata, ROOM_VAULT_ABI } from "@/lib/roomVault";
+import { ROOM_VAULT_ADDRESS, toU256Calldata, ROOM_VAULT_ABI, formatStrkAmount } from "@/lib/roomVault";
 import { useReadContract } from "@starknet-react/core";
 import {
     LiveKitRoom,
@@ -216,11 +216,7 @@ function RoomInterface({
         if (!vaultDeployed) return "0.0000";
         if (!vaultRawBalance) return "0.0000";
         try {
-            const d = vaultRawBalance as any;
-            const raw = d.low !== undefined
-                ? BigInt(d.low.toString()) + BigInt(d.high?.toString() || '0') * 340282366920938463463374607431768211456n
-                : BigInt(d.toString());
-            return (Number(raw) / 1e18).toFixed(4);
+            return formatStrkAmount(vaultRawBalance as any);
         } catch { return "0.0000"; }
     })();
 

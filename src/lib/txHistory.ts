@@ -21,8 +21,13 @@ export function saveTx(walletAddress: string, record: TxRecord) {
     try {
         const key = storageKey(walletAddress);
         const existing: TxRecord[] = loadTxHistory(walletAddress);
-        // Prevent duplicates by txHash
-        if (!existing.find(t => t.txHash === record.txHash)) {
+        // Prevent duplicates by txHash (or by timestamp/amount if txHash is empty)
+        const isDuplicate = existing.find(t =>
+            (record.txHash ? t.txHash === record.txHash : false) ||
+            (!record.txHash && !t.txHash && t.timestamp === record.timestamp && t.amount === record.amount)
+        );
+
+        if (!isDuplicate) {
             const updated = [record, ...existing].slice(0, 100); // keep last 100
             localStorage.setItem(key, JSON.stringify(updated));
         }

@@ -4,7 +4,7 @@ import React, { useEffect, useState } from "react";
 import { useAccount, useDisconnect, useReadContract } from "@starknet-react/core";
 import { loadTxHistory, saveTx, TxRecord } from "@/lib/txHistory";
 import { useStrkBalance } from "@/lib/useStrkBalance";
-import { ROOM_VAULT_ADDRESS, ROOM_VAULT_ABI, STRK_ADDRESS, STRK_APPROVE_ABI, toU256Calldata } from "@/lib/roomVault";
+import { ROOM_VAULT_ADDRESS, ROOM_VAULT_ABI, STRK_ADDRESS, STRK_APPROVE_ABI, toU256Calldata, formatStrkAmount } from "@/lib/roomVault";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
@@ -383,11 +383,7 @@ function WalletDrawer({ isOpen, onClose }: { isOpen: boolean, onClose: () => voi
         if (!vaultDeployed) return "0.0000";
         if (!vaultRawBalance) return "0.0000";
         try {
-            const d = vaultRawBalance as any;
-            const raw = d.low !== undefined
-                ? BigInt(d.low.toString()) + BigInt(d.high?.toString() || '0') * 340282366920938463463374607431768211456n
-                : BigInt(d.toString());
-            return (Number(raw) / 1e18).toFixed(4);
+            return formatStrkAmount(vaultRawBalance as any);
         } catch { return "0.0000"; }
     })();
 
