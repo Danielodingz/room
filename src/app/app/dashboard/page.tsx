@@ -352,7 +352,7 @@ function LargeActionButton({ icon, label, color, description, hasDropdown = fals
 
 function WalletDrawer({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) {
     const { address, account } = useAccount();
-    const [view, setView] = useState<'home' | 'send' | 'receive'>('home');
+    const [view, setView] = useState<'home' | 'send' | 'receive' | 'deposit'>('home');
     const [copied, setCopied] = useState(false);
     const [txHistory, setTxHistory] = useState<TxRecord[]>([]);
 
@@ -475,15 +475,11 @@ function WalletDrawer({ isOpen, onClose }: { isOpen: boolean, onClose: () => voi
         if (!amount || amount < TOKEN_MIN) return;
         try {
             setSendStatus("pending");
-            const DECIMALS_FACTOR = 1_000_000_000_000_000_000n;
-            const amountRaw = BigInt(Math.round(amount * 1e9)) * (DECIMALS_FACTOR / 1_000_000_000n);
-            const U128_MAX = 340282366920938463463374607431768211456n;
-            const low = amountRaw % U128_MAX;
-            const high = amountRaw / U128_MAX;
+            const [low, high] = toU256Calldata(amount);
             const result = await account.execute([{
-                contractAddress: STRK_CONTRACT,
-                entrypoint: "transfer",
-                calldata: [sendTo.trim(), low.toString(), high.toString()]
+                contractAddress: ROOM_VAULT_ADDRESS,
+                entrypoint: "transfer_in_room",
+                calldata: [sendTo.trim(), low, high]
             }]);
             setSendTxHash(result.transaction_hash);
             setSendStatus("success");
@@ -566,6 +562,12 @@ function WalletDrawer({ isOpen, onClose }: { isOpen: boolean, onClose: () => voi
 
                                 <div className="flex gap-3 relative z-10">
                                     <button
+                                        onClick={() => { setDepositStatus("idle"); setDepositError(""); setDepositAmount(""); setView('deposit'); }}
+                                        className="flex-1 bg-blue-500 hover:bg-blue-400 text-black font-black py-4 rounded-2xl transition-all shadow-lg active:scale-95"
+                                    >
+                                        Deposit
+                                    </button>
+                                    <button
                                         onClick={() => { setSendStatus("idle"); setSendTxHash(""); setSendError(""); setSendTo(""); setSendAmount(""); setView('send'); }}
                                         className="flex-1 bg-yellow-500 hover:bg-yellow-400 text-black font-black py-4 rounded-2xl transition-all shadow-lg shadow-yellow-500/20 active:scale-95"
                                     >
@@ -626,6 +628,77 @@ function WalletDrawer({ isOpen, onClose }: { isOpen: boolean, onClose: () => voi
                                     </div>
                                 )}
                             </div>
+                        </div>
+                    )}
+
+                    {view === 'deposit' && (
+                        <div className="flex flex-col gap-6 animate-in fade-in slide-in-from-right-4 duration-500">
+                            <div>
+                                <h1 className="text-[40px] font-extrabold leading-[1.1] tracking-tight mb-2">Deposit<br />STRK</h1>
+                                <p className="text-gray-500 font-medium">Move STRK from your wallet into the Room Vault.</p>
+                            </div>
+
+                            {!vaultDeployed ? (
+                                <div className="bg-orange-500/10 border border-orange-500/20 rounded-2xl p-6 flex flex-col gap-3 items-center text-center">
+                                    <span className="text-orange-400 font-black text-[16px]">Smart contract not yet deployed</span>
+                                    <p className="text-orange-300/60 text-[13px]">The RoomVault contract is being deployed to Sepolia. Once deployed, deposits will be enabled.</p>
+                                </div>
+                            ) : depositStatus !== 'success' ? (
+                                <div className="flex flex-col gap-5">
+                                    <div className="flex flex-col gap-2">
+                                        <label className="text-[13px] font-bold text-gray-400 uppercase tracking-widest px-1">Amount (STRK)</label>
+                                        <div className="bg-[#1C1C1E] rounded-2xl border border-white/10 p-4 flex items-center justify-between focus-within:border-blue-500/50 transition-all">
+                                            <input
+                                                type="number"
+                                                placeholder="0.00"
+                                                min="0.1"
+                                                step="0.1"
+                                                value={depositAmount}
+                                                onChange={e => setDepositAmount(e.target.value)}
+                                                disabled={depositStatus === 'pending'}
+                                                className="bg-transparent border-none outline-none w-full text-white placeholder:text-gray-600 font-bold text-[22px]"
+                                            />
+                                            <button onClick={() => setDepositAmount(strkFormatted)} className="text-blue-400 font-black text-[13px] uppercase tracking-wider hover:text-blue-300">Max</button>
+                                        </div>
+                                        <div className="flex justify-between px-1">
+                                            <span className="text-[12px] text-gray-500">Wallet balance: {formattedBalance}</span>
+                                            <span className="text-[12px] text-gray-600">Min: 0.1 STRK</span>
+                                        </div>
+                                    </div>
+
+                                    {depositStatus === 'error' && (
+                                        <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-4 text-red-400 text-[13px]">{depositError}</div>
+                                    )}
+
+                                    <button
+                                        onClick={handleDeposit}
+                                        disabled={depositStatus === 'pending' || parseFloat(depositAmount) < 0.1 || !account}
+                                        className="w-full bg-blue-500 hover:bg-blue-400 disabled:opacity-40 text-black font-black py-5 rounded-[24px] transition-all shadow-xl shadow-blue-500/10 flex items-center justify-center gap-3 active:scale-95"
+                                    >
+                                        {depositStatus === 'pending' ? (
+                                            <><Loader2 size={20} className="animate-spin" />Depositing...</>
+                                        ) : (
+                                            <><ArrowRight size={20} />Deposit {depositAmount || '0'} STRK</>
+                                        )}
+                                    </button>
+                                    {!account && (
+                                        <p className="text-center text-[12px] text-red-400">
+                                            Wallet not connected — cannot deposit
+                                        </p>
+                                    )}
+                                </div>
+                            ) : (
+                                <div className="flex flex-col items-center gap-6 py-8 text-center">
+                                    <div className="w-20 h-20 bg-green-500/10 rounded-full flex items-center justify-center border border-green-500/20">
+                                        <Check size={36} className="text-green-400" />
+                                    </div>
+                                    <div>
+                                        <p className="text-[20px] font-black text-white">Deposited!</p>
+                                        <p className="text-gray-500 text-[14px] mt-1">{depositAmount} STRK added to Room Vault</p>
+                                    </div>
+                                    <button onClick={() => { setDepositStatus('idle'); setDepositAmount(''); }} className="w-full bg-white/5 border border-white/10 text-white font-black py-4 rounded-2xl transition-all hover:bg-white/10 active:scale-95">Deposit More</button>
+                                </div>
+                            )}
                         </div>
                     )}
 
@@ -776,7 +849,7 @@ function WalletDrawer({ isOpen, onClose }: { isOpen: boolean, onClose: () => voi
 
                                     <button
                                         onClick={handleWithdraw}
-                                        disabled={withdrawStatus === 'pending' || !withdrawTo.trim() || parseFloat(withdrawAmount) <= 0}
+                                        disabled={withdrawStatus === 'pending' || !withdrawTo.trim() || parseFloat(withdrawAmount) <= 0 || parseFloat(withdrawAmount) > parseFloat(vaultBalance)}
                                         className="w-full bg-yellow-500 hover:bg-yellow-400 disabled:opacity-40 text-black font-black py-5 rounded-[24px] transition-all shadow-xl shadow-yellow-500/10 flex items-center justify-center gap-3 active:scale-95"
                                     >
                                         {withdrawStatus === 'pending' ? (

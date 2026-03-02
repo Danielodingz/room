@@ -12,7 +12,8 @@ import {
     ExternalLink, AtSign, DollarSign
 } from "lucide-react";
 import { useAccount } from "@starknet-react/core";
-import { useStrkBalance } from "@/lib/useStrkBalance";
+import { ROOM_VAULT_ADDRESS, toU256Calldata, ROOM_VAULT_ABI } from "@/lib/roomVault";
+import { useReadContract } from "@starknet-react/core";
 import {
     LiveKitRoom,
     RoomAudioRenderer,
@@ -200,7 +201,28 @@ function RoomInterface({
 }) {
     // ── Account + Balance ──
     const { account } = useAccount();
-    const { formatted: strkFormatted, isLoading: strkLoading } = useStrkBalance(address);
+
+    const vaultDeployed = ROOM_VAULT_ADDRESS !== "PLACEHOLDER_ROOM_VAULT_ADDRESS";
+    const { data: vaultRawBalance, refetch: refetchVault } = useReadContract({
+        abi: ROOM_VAULT_ABI,
+        address: ROOM_VAULT_ADDRESS as `0x${string}`,
+        functionName: "get_balance",
+        // @ts-expect-error starknet-react args loosely typed
+        args: address ? [address] : [],
+        enabled: vaultDeployed && !!address,
+        watch: true,
+    });
+    const vaultBalance = (() => {
+        if (!vaultDeployed) return "0.0000";
+        if (!vaultRawBalance) return "0.0000";
+        try {
+            const d = vaultRawBalance as any;
+            const raw = d.low !== undefined
+                ? BigInt(d.low.toString()) + BigInt(d.high?.toString() || '0') * 340282366920938463463374607431768211456n
+                : BigInt(d.toString());
+            return (Number(raw) / 1e18).toFixed(4);
+        } catch { return "0.0000"; }
+    })();
 
     // ── UI State ──
     const [isHandRaised, setIsHandRaised] = useState(false);
@@ -335,21 +357,15 @@ function RoomInterface({
         try {
             setTxStatus("pending");
 
-            // Proper Cairo uint256 encoding: split into low/high 128-bit parts
-            // TOKEN_DECIMALS = 18, so multiplier = 1_000_000_000_000_000_000n
-            const DECIMALS_FACTOR = 1_000_000_000_000_000_000n; // 10^18
-            const amountRaw = BigInt(Math.round(finalAmount * 1e9)) * (DECIMALS_FACTOR / 1_000_000_000n);
-            const U128_MAX = 340282366920938463463374607431768211456n; // 2^128
-            const low = amountRaw % U128_MAX;
-            const high = amountRaw / U128_MAX;
+            const [low, high] = toU256Calldata(finalAmount);
 
             const result = await account.execute([{
-                contractAddress: TOKEN_CONTRACT,
-                entrypoint: "transfer",
+                contractAddress: ROOM_VAULT_ADDRESS,
+                entrypoint: "transfer_in_room",
                 calldata: [
                     usdcRecipient.walletAddress,
-                    low.toString(),
-                    high.toString()
+                    low,
+                    high
                 ]
             }]);
 
@@ -391,7 +407,7 @@ function RoomInterface({
     const otherParticipants = participants.filter(p => p.identity !== address);
 
     // Formatted STRK balance for header display
-    const formattedBalance = strkLoading ? "…" : strkFormatted ? `${strkFormatted} ${TOKEN_SYMBOL}` : null;
+    const formattedBalance = vaultBalance;
 
     // Listen for incoming payment notifications via LiveKit
     useEffect(() => {
@@ -443,16 +459,14 @@ function RoomInterface({
                     <span className="text-[12px] font-bold text-gray-300">{participants.length}</span>
                 </div>
                 {/* Wallet STRK balance */}
-                {formattedBalance && (
-                    <div
-                        className="px-3 py-1.5 bg-yellow-500/10 backdrop-blur-md rounded-lg border border-yellow-500/20 flex items-center gap-2 cursor-pointer hover:bg-yellow-500/20 transition-colors"
-                        onClick={() => openSendUsdc()}
-                        title="Click to send STRK"
-                    >
-                        <Coins size={13} className="text-yellow-400" />
-                        <span className="text-[12px] font-bold text-yellow-300">{formattedBalance}</span>
-                    </div>
-                )}
+                <div
+                    className="px-3 py-1.5 bg-yellow-500/10 backdrop-blur-md rounded-lg border border-yellow-500/20 flex items-center gap-2 cursor-pointer hover:bg-yellow-500/20 transition-colors"
+                    onClick={() => openSendUsdc()}
+                    title="Click to send STRK"
+                >
+                    <Coins size={13} className="text-yellow-400" />
+                    <span className="text-[12px] font-bold text-yellow-300">{vaultBalance} {TOKEN_SYMBOL}</span>
+                </div>
             </div>
 
             {/* ── Raised Hands ── */}
@@ -736,8 +750,8 @@ function RoomInterface({
                                     <Coins size={20} className="text-yellow-400" />
                                 </div>
                                 <div>
-                                    <h2 className="text-[17px] font-bold">Send USDC</h2>
-                                    <p className="text-[12px] text-gray-500">Starknet · instant transfer</p>
+                                    <h2 className="text-[17px] font-bold">Send STRK</h2>
+                                    <p className="text-[12px] text-gray-500">Starknet · inside Room Vault</p>
                                 </div>
                             </div>
                             <button
@@ -759,7 +773,7 @@ function RoomInterface({
                                     <div className="text-center">
                                         <p className="text-[16px] font-bold text-green-400">Sent!</p>
                                         <p className="text-[13px] text-gray-400 mt-1">
-                                            {customAmount || usdcAmount} USDC → @{usdcRecipient?.name}
+                                            {customAmount || usdcAmount} STRK → @{usdcRecipient?.name}
                                         </p>
                                     </div>
                                     {txHash && (
@@ -844,7 +858,7 @@ function RoomInterface({
                                     {/* Step 2: Pick amount */}
                                     <div>
                                         <p className="text-[11px] font-bold uppercase tracking-widest text-gray-500 mb-3 flex items-center gap-2">
-                                            <DollarSign size={12} /> Amount (USDC)
+                                            <DollarSign size={12} /> Amount (STRK)
                                         </p>
                                         <div className="grid grid-cols-4 gap-2 mb-3">
                                             {[5, 10, 25, 50].map((amt) => (
@@ -872,7 +886,7 @@ function RoomInterface({
                                     {/* Send Button */}
                                     <button
                                         onClick={handleSendToken}
-                                        disabled={!usdcRecipient || txStatus === "pending" || (parseFloat(customAmount || usdcAmount.toString()) < TOKEN_MIN)}
+                                        disabled={!usdcRecipient || txStatus === "pending" || (parseFloat(customAmount || usdcAmount.toString()) < TOKEN_MIN) || (parseFloat(customAmount || usdcAmount.toString()) > parseFloat(vaultBalance))}
                                         className="w-full bg-yellow-500 hover:bg-yellow-400 disabled:opacity-40 disabled:hover:bg-yellow-500 text-black font-black py-4 rounded-2xl text-[14px] transition-all shadow-lg shadow-yellow-500/20 active:scale-[0.98] flex items-center justify-center gap-2"
                                     >
                                         {txStatus === "pending" ? (
