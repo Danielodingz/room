@@ -2,8 +2,12 @@
 
 import Link from "next/link";
 import Image from "next/image";
+import { useAccount } from "@starknet-react/core";
+import { Loader2 } from "lucide-react";
 
 export default function Navbar() {
+    const { isConnecting, isReconnecting, status } = useAccount();
+    const isLoading = isConnecting || isReconnecting || status === "connecting";
     return (
         <nav className="fixed top-0 left-0 right-0 z-50 flex justify-center pt-8 px-6">
             <div className="navbar-mesh-gradient" />
@@ -27,8 +31,15 @@ export default function Navbar() {
                     <Link href="#faqs" className="text-[15px] font-bold text-[#121212] hover:opacity-70 transition-opacity">FAQs</Link>
                 </div>
 
-                <Link href="/app" className="pill-button-secondary bg-white whitespace-nowrap min-w-[140px] border-[#D1D1D1] flex items-center justify-center">
-                    Launch app
+                <Link href="/app" className={`pill-button-secondary bg-white whitespace-nowrap min-w-[140px] border-[#D1D1D1] flex items-center justify-center gap-2 ${isLoading ? 'opacity-70 pointer-events-none' : ''}`}>
+                    {isLoading ? (
+                        <>
+                            <Loader2 size={16} className="animate-spin text-[#121212]" />
+                            Connecting...
+                        </>
+                    ) : (
+                        "Launch app"
+                    )}
                 </Link>
             </div>
         </nav>

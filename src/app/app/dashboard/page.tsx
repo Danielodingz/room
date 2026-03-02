@@ -34,7 +34,7 @@ import {
 } from "lucide-react";
 
 export default function DashboardPage() {
-    const { address, isConnected } = useAccount();
+    const { address, isConnected, isConnecting, isReconnecting } = useAccount();
     const { disconnect } = useDisconnect();
     const router = useRouter();
     const [currentTime, setCurrentTime] = useState(new Date());
@@ -69,18 +69,27 @@ export default function DashboardPage() {
         return () => clearInterval(timer);
     }, []);
 
-    // Redirect to landing page if not connected
+    // Redirect to landing page only if definitely not connected or trying to connect
     useEffect(() => {
-        if (!isConnected) {
+        if (!isConnected && !isConnecting && !isReconnecting) {
             router.push("/");
         }
-    }, [isConnected, router]);
+    }, [isConnected, isConnecting, isReconnecting, router]);
 
     const shortenedAddress = address
         ? `${address.slice(0, 6)}...${address.slice(-4)}`
         : "";
 
-    if (!isConnected) return null;
+    if (!isConnected && !isConnecting && !isReconnecting) return null;
+
+    if (isConnecting || isReconnecting) {
+        return (
+            <main className="min-h-screen bg-[#0A0A0B] flex flex-col items-center justify-center text-white">
+                <Loader2 size={40} className="animate-spin text-white/50 mb-4" />
+                <p className="text-white/60 text-sm font-medium tracking-wide">Connecting wallet...</p>
+            </main>
+        );
+    }
 
     return (
         <main className="min-h-screen bg-[#0A0A0B] text-white font-sans flex">
