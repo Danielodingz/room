@@ -437,7 +437,7 @@ function RoomInterface({
         <div className="flex flex-col flex-1 relative overflow-hidden">
 
             {/* ── Header Overlay ── */}
-            <div className="absolute top-4 left-6 z-20 flex items-center gap-4">
+            <div className="absolute top-2 left-2 md:top-4 md:left-6 z-20 flex flex-wrap items-center gap-2 md:gap-4 max-w-[calc(100vw-80px)]">
                 {/* Username + shield badge */}
                 <div className="flex items-center gap-2 px-3 py-1.5 bg-black/40 backdrop-blur-md rounded-lg border border-white/5 shadow-xl">
                     <div className="w-5 h-5 relative">
@@ -476,7 +476,7 @@ function RoomInterface({
 
             {/* ── Raised Hands ── */}
             {raisedHands.length > 0 && (
-                <div className="absolute top-20 left-6 z-20 flex flex-col gap-2">
+                <div className="absolute top-16 md:top-20 left-2 md:left-6 z-20 flex flex-col gap-2">
                     {raisedHands.map((hand, idx) => (
                         <div key={`${hand}-${idx}`} className="bg-yellow-500/90 text-black px-3 py-1.5 rounded-lg flex items-center gap-2 font-bold text-[13px] animate-in slide-in-from-left shadow-lg">
                             <Hand size={16} className="animate-pulse" />
@@ -488,7 +488,7 @@ function RoomInterface({
 
             {/* ── Payment received banner ── */}
             {paymentNotif && (
-                <div className="absolute top-20 right-6 z-50 animate-in slide-in-from-right duration-300 bg-yellow-500/90 text-black px-4 py-3 rounded-2xl flex items-center gap-3 shadow-2xl backdrop-blur-md border border-yellow-400">
+                <div className="absolute top-16 md:top-20 right-2 md:right-6 z-50 animate-in slide-in-from-right duration-300 bg-yellow-500/90 text-black px-4 py-3 rounded-2xl flex items-center gap-3 shadow-2xl backdrop-blur-md border border-yellow-400">
                     <Coins size={20} className="text-black" />
                     <div>
                         <p className="text-[13px] font-black">You received {paymentNotif.amount} {TOKEN_SYMBOL}!</p>
@@ -501,7 +501,7 @@ function RoomInterface({
             )}
 
             {/* ── Top Right Controls ── */}
-            <div className="absolute top-4 right-6 z-20 flex items-center gap-2">
+            <div className="absolute top-2 right-2 md:top-4 md:right-6 z-20 flex items-center gap-2">
                 <button className="p-2 bg-black/40 backdrop-blur-md rounded-lg border border-white/5 hover:bg-white/5 transition-colors text-gray-400 hover:text-white">
                     <Maximize2 size={18} />
                 </button>
@@ -545,8 +545,8 @@ function RoomInterface({
 
                 {/* ── Chat Sidebar ── */}
                 {isChatOpen && (
-                    <div className="w-[380px] bg-[#111112] border-l border-white/5 flex flex-col animate-in slide-in-from-right duration-300 shadow-2xl relative z-30">
-                        <div className="p-6 flex items-center justify-between border-b border-white/5">
+                    <div className="absolute inset-0 md:relative w-full md:w-[380px] bg-[#111112] border-l border-white/5 flex flex-col animate-in slide-in-from-right duration-300 shadow-2xl z-50 md:z-30">
+                        <div className="p-4 md:p-6 flex items-center justify-between border-b border-white/5">
                             <h2 className="text-[18px] font-bold tracking-tight">Meeting Chat</h2>
                             <div className="flex items-center gap-2">
                                 <button className="p-2 hover:bg-white/5 rounded-lg text-gray-400"><Maximize2 size={16} /></button>
@@ -633,10 +633,10 @@ function RoomInterface({
             </div>
 
             {/* ── Bottom Toolbar ── */}
-            <div className="h-[96px] bg-[#0A0A0B]/80 backdrop-blur-xl border-t border-white/5 px-8 flex items-center justify-between z-40 relative shadow-[0_-20px_40px_-5px_rgba(0,0,0,0.4)]">
+            <div className="h-auto min-h-[80px] md:h-[96px] bg-[#0A0A0B]/80 backdrop-blur-xl border-t border-white/5 px-2 md:px-8 py-3 md:py-0 flex flex-wrap items-center justify-center sm:justify-between gap-y-3 z-40 relative shadow-[0_-20px_40px_-5px_rgba(0,0,0,0.4)]">
 
                 {/* Left: Mic + Camera */}
-                <div className="flex items-center gap-2 min-w-[120px]">
+                <div className="flex items-center gap-2 min-w-[120px] justify-center sm:justify-start">
                     <div className="flex flex-col group p-1">
                         <ControlButton
                             icon={!isMicrophoneEnabled ? <MicOff className="text-red-500" /> : <Mic />}
@@ -656,7 +656,7 @@ function RoomInterface({
                 </div>
 
                 {/* Center: Main Controls */}
-                <div className="flex items-center gap-1 md:gap-4 bg-white/[0.02] border border-white/5 px-4 py-1.5 rounded-2xl shadow-xl">
+                <div className="flex w-full sm:w-auto overflow-x-auto custom-scrollbar sm:overflow-visible items-center gap-1 md:gap-4 bg-white/[0.02] border border-white/5 px-4 py-1.5 rounded-2xl shadow-xl justify-start sm:justify-center shrink-0">
                     <ControlButton icon={<Users />} label="Participants" badge={participants.length.toString()} hasArrow />
                     <ControlButton
                         icon={<MessageSquare />}
@@ -718,7 +718,7 @@ function RoomInterface({
                 </div>
 
                 {/* Right: End / Leave */}
-                <div className="min-w-[120px] flex justify-end gap-2">
+                <div className="w-full sm:w-auto min-w-[120px] flex justify-center sm:justify-end gap-2">
                     {isHost && (
                         <button
                             onClick={handleEndMeetingGlobally}

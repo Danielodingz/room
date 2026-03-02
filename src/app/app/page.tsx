@@ -58,14 +58,23 @@ export default function ConnectWalletPage() {
                             disabled={isLoading}
                             className={`w-full pill-button-secondary bg-white hover:bg-gray-50 flex items-center justify-center gap-3 transition-all h-[56px] border-[#D1D1D1] ${isLoading ? 'opacity-50 cursor-not-allowed' : 'active:scale-95'}`}
                         >
-                            {connector.icon && (
-                                <img
-                                    src={typeof connector.icon === 'string' ? connector.icon : connector.icon.light}
-                                    alt={connector.name}
-                                    className="w-6 h-6"
-                                />
+                            {isLoading ? (
+                                <>
+                                    <Loader2 size={20} className="animate-spin text-[#121212]" />
+                                    <span className="font-bold">Connecting...</span>
+                                </>
+                            ) : (
+                                <>
+                                    {connector.icon && (
+                                        <img
+                                            src={typeof connector.icon === 'string' ? connector.icon : connector.icon.light}
+                                            alt={connector.name}
+                                            className="w-6 h-6"
+                                        />
+                                    )}
+                                    <span className="font-bold">Connect {connector.name}</span>
+                                </>
                             )}
-                            <span className="font-bold">Connect {connector.name}</span>
                         </button>
                     ))}
                 </div>

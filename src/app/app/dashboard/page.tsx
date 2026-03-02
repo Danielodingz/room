@@ -94,9 +94,9 @@ export default function DashboardPage() {
     }
 
     return (
-        <main className="min-h-screen bg-[#0A0A0B] text-white font-sans flex">
-            {/* Sidebar Navigation */}
-            <aside className="w-[84px] md:w-[240px] border-r border-white/5 flex flex-col bg-[#FFFFFF] sticky top-0 h-screen py-6">
+        <main className="min-h-screen bg-[#0A0A0B] text-white font-sans flex flex-col md:flex-row pb-20 md:pb-0">
+            {/* Sidebar Navigation (Desktop) */}
+            <aside className="hidden md:flex w-[84px] md:w-[240px] border-r border-white/5 flex-col bg-[#FFFFFF] sticky top-0 h-screen py-6">
                 <div className="px-6 mb-10 flex items-center justify-center md:justify-start gap-3">
                     <div className="w-[32px] h-[32px] relative">
                         <Image src="/assets/logos/logo.png" alt="Room" fill className="object-contain" />
@@ -125,20 +125,40 @@ export default function DashboardPage() {
                 </div>
             </aside>
 
+            {/* Mobile Bottom Navigation */}
+            <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#FFFFFF] border-t border-white/10 flex items-center justify-around h-16 pb-safe">
+                <button onClick={() => setIsWalletOpen(false)} className={`p-2 flex flex-col items-center gap-1 ${!isWalletOpen ? 'text-black' : 'text-gray-400'}`}>
+                    <Home size={20} />
+                    <span className="text-[10px] font-bold">Home</span>
+                </button>
+                <button onClick={() => setIsWalletOpen(true)} className={`p-2 flex flex-col items-center gap-1 ${isWalletOpen ? 'text-black' : 'text-gray-400'}`}>
+                    <Wallet size={20} />
+                    <span className="text-[10px] font-bold">Wallet</span>
+                </button>
+                <button className="p-2 flex flex-col items-center gap-1 text-gray-400">
+                    <Video size={20} />
+                    <span className="text-[10px] font-bold">Meetings</span>
+                </button>
+                <button onClick={() => disconnect()} className="p-2 flex flex-col items-center gap-1 text-red-400">
+                    <LogOut size={20} />
+                    <span className="text-[10px] font-bold">Exit</span>
+                </button>
+            </nav>
+
             {/* Main Content Area */}
-            <div className="flex-1 flex flex-col relative min-h-screen">
+            <div className="flex-1 flex flex-col relative min-h-screen pb-16 md:pb-0">
                 {/* Header (Search & Wallet) */}
-                <header className="h-[72px] px-8 flex items-center justify-between bg-[#0A0A0B]/80 backdrop-blur-md sticky top-0 z-10 border-b border-white/5">
-                    <div className="flex items-center bg-white/5 border border-white/10 rounded-xl px-4 py-2 w-[320px] focus-within:border-blue-500/50 transition-all group">
-                        <Search size={16} className="text-gray-500 group-focus-within:text-blue-400" />
+                <header className="h-[72px] px-4 md:px-8 flex items-center justify-between bg-[#0A0A0B]/80 backdrop-blur-md sticky top-0 z-10 border-b border-white/5 gap-2">
+                    <div className="flex items-center bg-white/5 border border-white/10 rounded-xl px-3 md:px-4 py-2 w-[140px] md:w-[320px] focus-within:border-blue-500/50 transition-all group">
+                        <Search size={16} className="text-gray-500 group-focus-within:text-blue-400 shrink-0" />
                         <input
                             type="text"
-                            placeholder="Search meetings, recordings..."
-                            className="bg-transparent border-none outline-none text-[14px] w-full ml-3 text-gray-300 placeholder:text-gray-600"
+                            placeholder="Search..."
+                            className="bg-transparent border-none outline-none text-[14px] w-full ml-2 md:ml-3 text-gray-300 placeholder:text-gray-600"
                         />
                     </div>
 
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2 md:gap-4">
                         <button
                             onClick={() => setIsNotificationsOpen(true)}
                             className="relative p-2 text-gray-500 hover:text-blue-400 hover:bg-white/5 rounded-xl transition-all group"
@@ -148,23 +168,23 @@ export default function DashboardPage() {
                         </button>
                         <div
                             onClick={() => setIsWalletOpen(true)}
-                            className="flex items-center gap-2 px-4 py-2 bg-white/5 rounded-xl border border-white/10 shadow-sm hover:border-white/20 transition-all cursor-pointer"
+                            className="hidden md:flex items-center gap-2 px-4 py-2 bg-white/5 rounded-xl border border-white/10 shadow-sm hover:border-white/20 transition-all cursor-pointer"
                         >
                             <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
                             <span className="text-[13px] font-bold text-gray-300">{shortenedAddress}</span>
                         </div>
                         <div
                             onClick={() => setIsWalletOpen(true)}
-                            className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center border border-white/10 shadow-sm overflow-hidden hover:border-white/20 transition-all cursor-pointer"
+                            className="w-8 h-8 md:w-10 md:h-10 shrink-0 rounded-full bg-blue-500/10 flex items-center justify-center border border-white/10 shadow-sm overflow-hidden hover:border-white/20 transition-all cursor-pointer"
                         >
-                            <User size={20} className="text-blue-400" />
+                            <User size={18} className="text-blue-400" />
                         </div>
                     </div>
                 </header>
 
-                <div className="p-8 md:p-12 flex-1 flex flex-col lg:flex-row items-center justify-center gap-16 max-w-[1400px] mx-auto w-full">
+                <div className="p-4 md:p-8 lg:p-12 flex-1 flex flex-col lg:flex-row items-center justify-center gap-10 md:gap-16 max-w-[1400px] mx-auto w-full">
                     {/* Action Buttons */}
-                    <div className="flex flex-wrap justify-center gap-10">
+                    <div className="flex flex-wrap justify-center gap-4 md:gap-10 w-full max-w-lg lg:max-w-none">
                         <div className="relative">
                             <LargeActionButton
                                 icon={<Video className="text-black" size={32} />}
@@ -180,7 +200,7 @@ export default function DashboardPage() {
 
                             {/* New Meeting Dropdown */}
                             {isNewMeetingOpen && (
-                                <div className="absolute top-[100%] left-1/2 -translate-x-1/2 mt-4 w-[280px] bg-[#1C1C1E] border border-white/10 rounded-[24px] shadow-2xl z-50 p-5 animate-in fade-in zoom-in-95 duration-200">
+                                <div className="absolute top-[100%] left-1/2 -translate-x-1/2 mt-4 w-[280px] max-w-[90vw] bg-[#1C1C1E] border border-white/10 rounded-[24px] shadow-2xl z-50 p-5 animate-in fade-in zoom-in-95 duration-200">
                                     <div className="flex flex-col gap-5">
                                         <div className="flex items-center justify-between">
                                             <span className="text-[14px] font-bold text-gray-300">New Meeting</span>
@@ -240,7 +260,7 @@ export default function DashboardPage() {
 
                             {/* Join Meeting Dropdown */}
                             {isJoinMeetingOpen && (
-                                <div className="absolute top-[100%] left-1/2 -translate-x-1/2 mt-4 w-[280px] bg-[#1C1C1E] border border-white/10 rounded-[24px] shadow-2xl z-50 p-5 animate-in fade-in zoom-in-95 duration-200">
+                                <div className="absolute top-[100%] left-1/2 -translate-x-1/2 mt-4 w-[280px] max-w-[90vw] bg-[#1C1C1E] border border-white/10 rounded-[24px] shadow-2xl z-50 p-5 animate-in fade-in zoom-in-95 duration-200">
                                     <div className="flex flex-col gap-5">
                                         <div className="flex items-center justify-between">
                                             <span className="text-[14px] font-bold text-gray-300">Join Meeting</span>
@@ -283,7 +303,7 @@ export default function DashboardPage() {
                     </div>
 
                     {/* Meeting Card (Time only with Background) */}
-                    <div className="w-full max-w-[500px] rounded-[40px] shadow-[0_32px_64px_-16px_rgba(0,0,0,0.6)] overflow-hidden relative group transition-all duration-500 hover:scale-[1.02]">
+                    <div className="w-full max-w-[340px] sm:max-w-[500px] rounded-[32px] md:rounded-[40px] shadow-[0_32px_64px_-16px_rgba(0,0,0,0.6)] overflow-hidden relative group transition-all duration-500 hover:scale-[1.02] aspect-video sm:aspect-auto">
                         <Image
                             src="/assets/images/dashboard_card_bg.png"
                             alt="Dashboard Card Background"
@@ -294,8 +314,8 @@ export default function DashboardPage() {
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent opacity-100" />
 
-                        <div className="absolute inset-0 p-10 flex flex-col justify-end">
-                            <h2 className="text-[64px] font-extrabold text-white leading-none tracking-tighter drop-shadow-[0_4px_12px_rgba(0,0,0,0.5)] animate-in fade-in slide-in-from-bottom-4 duration-700">
+                        <div className="absolute inset-0 p-6 md:p-10 flex flex-col justify-end">
+                            <h2 className="text-[48px] md:text-[64px] font-extrabold text-white leading-none tracking-tighter drop-shadow-[0_4px_12px_rgba(0,0,0,0.5)] animate-in fade-in slide-in-from-bottom-4 duration-700">
                                 {currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }).toUpperCase()}
                             </h2>
                         </div>
@@ -544,8 +564,8 @@ function WalletDrawer({ isOpen, onClose }: { isOpen: boolean, onClose: () => voi
             />
 
             {/* Drawer Panel */}
-            <div className={`w-full max-w-[440px] bg-[#0E0E10] h-full shadow-2xl border-l border-white/5 relative z-10 transition-transform duration-500 transform ${isOpen ? "translate-x-0" : "translate-x-full"} flex flex-col`}>
-                <div className="p-8 flex flex-col gap-8 h-full overflow-y-auto custom-scrollbar">
+            <div className={`w-full md:w-auto md:min-w-[440px] max-w-[100vw] bg-[#0E0E10] h-full shadow-2xl border-l border-white/5 relative z-10 transition-transform duration-500 transform ${isOpen ? "translate-x-0" : "translate-x-full"} flex flex-col`}>
+                <div className="p-5 md:p-8 flex flex-col gap-8 h-full overflow-y-auto custom-scrollbar">
                     {/* Dynamic Header */}
                     <div className="flex items-center justify-between">
                         <button
@@ -949,8 +969,8 @@ function NotificationDrawer({ isOpen, onClose }: { isOpen: boolean, onClose: () 
             />
 
             {/* Drawer Panel */}
-            <div className={`w-full max-w-[440px] bg-[#0E0E10] h-full shadow-2xl border-l border-white/5 relative z-10 transition-transform duration-500 transform ${isOpen ? "translate-x-0" : "translate-x-full"} flex flex-col`}>
-                <div className="p-8 flex flex-col gap-8 h-full overflow-y-auto custom-scrollbar">
+            <div className={`w-full md:w-auto md:min-w-[440px] max-w-[100vw] bg-[#0E0E10] h-full shadow-2xl border-l border-white/5 relative z-10 transition-transform duration-500 transform ${isOpen ? "translate-x-0" : "translate-x-full"} flex flex-col`}>
+                <div className="p-5 md:p-8 flex flex-col gap-8 h-full overflow-y-auto custom-scrollbar">
                     {/* Header */}
                     <div className="flex items-center justify-between">
                         <h2 className="text-[24px] font-bold">Notifications</h2>
