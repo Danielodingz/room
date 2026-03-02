@@ -580,14 +580,12 @@ function RoomInterface({
 
                         {/* Chat Input */}
                         <div className="p-6 border-t border-white/5 bg-[#111112] relative">
-                            <div className="flex items-center gap-2 mb-3 px-1">
-                                <span className="text-[12px] font-bold text-gray-500 uppercase tracking-widest">To:</span>
-                                <button className="flex items-center gap-1.5 px-3 py-1 bg-blue-500/10 border border-blue-500/20 rounded-lg text-blue-400 text-[12px] font-bold">
-                                    Everyone <ChevronUp size={12} />
-                                </button>
-                            </div>
+                            {/* Removed redundant 'To: Everyone' dropdown mockup */}
 
-                            <div className="bg-white/5 border border-white/10 rounded-2xl p-4 focus-within:border-blue-500/50 transition-all flex flex-col gap-4">
+                            <form
+                                onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }}
+                                className="bg-white/5 border border-white/10 rounded-2xl p-4 focus-within:border-blue-500/50 transition-all flex flex-col gap-4"
+                            >
                                 <textarea
                                     value={chatInput}
                                     onChange={(e) => setChatInput(e.target.value)}
@@ -602,10 +600,11 @@ function RoomInterface({
                                 />
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-1">
-                                        <button className="p-2 hover:bg-white/5 rounded-lg text-gray-400"><Paperclip size={18} /></button>
-                                        <button className="p-2 hover:bg-white/5 rounded-lg text-gray-400"><SmilePlus size={18} /></button>
+                                        <button type="button" className="p-2 hover:bg-white/5 rounded-lg text-gray-400"><Paperclip size={18} /></button>
+                                        <button type="button" className="p-2 hover:bg-white/5 rounded-lg text-gray-400"><SmilePlus size={18} /></button>
                                         {/* Gift/Send USDC button */}
                                         <button
+                                            type="button"
                                             onClick={() => openSendUsdc()}
                                             className="p-2 hover:bg-yellow-500/10 rounded-lg text-gray-400 hover:text-yellow-400 transition-all"
                                             title="Send USDC"
@@ -614,14 +613,14 @@ function RoomInterface({
                                         </button>
                                     </div>
                                     <button
-                                        onClick={handleSendMessage}
+                                        type="submit"
                                         disabled={!chatInput.trim() || isSending}
                                         className="p-2.5 bg-blue-500/10 text-blue-400 rounded-xl hover:bg-blue-500/20 transition-all disabled:opacity-50 active:scale-95"
                                     >
                                         <Send size={18} />
                                     </button>
                                 </div>
-                            </div>
+                            </form>
 
                             <div className="mt-2 flex items-center justify-center gap-2 py-1">
                                 <Users size={12} className="text-gray-600" />
@@ -633,10 +632,10 @@ function RoomInterface({
             </div>
 
             {/* ── Bottom Toolbar ── */}
-            <div className="h-auto min-h-[80px] md:h-[96px] bg-[#0A0A0B]/80 backdrop-blur-xl border-t border-white/5 px-2 md:px-8 py-3 md:py-0 flex flex-wrap items-center justify-center sm:justify-between gap-y-3 z-40 relative shadow-[0_-20px_40px_-5px_rgba(0,0,0,0.4)]">
+            <div className="h-[80px] md:h-[96px] bg-[#0A0A0B]/80 backdrop-blur-xl border-t border-white/5 px-2 md:px-8 flex items-center justify-between z-40 relative shadow-[0_-20px_40px_-5px_rgba(0,0,0,0.4)] overflow-hidden w-full">
 
                 {/* Left: Mic + Camera */}
-                <div className="flex items-center gap-2 min-w-[120px] justify-center sm:justify-start">
+                <div className="flex items-center gap-1 min-w-fit shrink-0">
                     <div className="flex flex-col group p-1">
                         <ControlButton
                             icon={!isMicrophoneEnabled ? <MicOff className="text-red-500" /> : <Mic />}
@@ -648,7 +647,7 @@ function RoomInterface({
                     <div className="flex flex-col group p-1">
                         <ControlButton
                             icon={!isCameraEnabled ? <VideoOff className="text-red-500" /> : <Video />}
-                            label={!isCameraEnabled ? "Start Video" : "Stop Video"}
+                            label={!isCameraEnabled ? "Stop" : "Video"}
                             onClick={toggleVideo}
                             hasArrow
                         />
@@ -656,8 +655,8 @@ function RoomInterface({
                 </div>
 
                 {/* Center: Main Controls */}
-                <div className="flex w-full sm:w-auto overflow-x-auto custom-scrollbar sm:overflow-visible items-center gap-1 md:gap-4 bg-white/[0.02] border border-white/5 px-4 py-1.5 rounded-2xl shadow-xl justify-start sm:justify-center shrink-0">
-                    <ControlButton icon={<Users />} label="Participants" badge={participants.length.toString()} hasArrow />
+                <div className="flex flex-1 overflow-x-auto custom-scrollbar hide-scrollbar items-center gap-2 md:gap-4 bg-white/[0.02] border border-white/5 px-3 md:px-4 py-1.5 rounded-2xl shadow-xl justify-start mx-2 shrink">
+                    <ControlButton icon={<Users />} label="Users" badge={participants.length.toString()} hasArrow />
                     <ControlButton
                         icon={<MessageSquare />}
                         label="Chat"
@@ -718,7 +717,7 @@ function RoomInterface({
                 </div>
 
                 {/* Right: End / Leave */}
-                <div className="w-full sm:w-auto min-w-[120px] flex justify-center sm:justify-end gap-2">
+                <div className="flex items-center justify-end gap-1 md:gap-2 shrink-0">
                     {isHost && (
                         <button
                             onClick={handleEndMeetingGlobally}
@@ -959,7 +958,7 @@ function ControlButton({
                     </div>
                 )}
             </button>
-            <span className={`text-[10px] font-bold uppercase tracking-wider text-center transition-colors
+            <span className={`text-[9px] md:text-[10px] font-bold uppercase tracking-wider text-center transition-colors
                 ${active ? "text-blue-400" : "text-gray-500 group-hover:text-gray-300"}`}>
                 {label}
             </span>

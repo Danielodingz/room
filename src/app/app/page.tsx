@@ -51,32 +51,62 @@ export default function ConnectWalletPage() {
                 </p>
 
                 <div className="space-y-4">
-                    {connectors.map((connector) => (
-                        <button
-                            key={connector.id}
-                            onClick={() => connect({ connector })}
-                            disabled={isLoading}
-                            className={`w-full pill-button-secondary bg-white hover:bg-gray-50 flex items-center justify-center gap-3 transition-all h-[56px] border-[#D1D1D1] ${isLoading ? 'opacity-50 cursor-not-allowed' : 'active:scale-95'}`}
-                        >
-                            {isLoading ? (
-                                <>
-                                    <Loader2 size={20} className="animate-spin text-[#121212]" />
-                                    <span className="font-bold">Connecting...</span>
-                                </>
-                            ) : (
-                                <>
-                                    {connector.icon && (
-                                        <img
-                                            src={typeof connector.icon === 'string' ? connector.icon : connector.icon.light}
-                                            alt={connector.name}
-                                            className="w-6 h-6"
-                                        />
-                                    )}
-                                    <span className="font-bold">Connect {connector.name}</span>
-                                </>
-                            )}
-                        </button>
-                    ))}
+                    <button
+                        onClick={() => {
+                            let c = connectors.find(c => c.id === "argentX");
+                            if (!c) c = connectors.find(c => c.id === "argentMobile");
+                            if (c) connect({ connector: c });
+                        }}
+                        disabled={isLoading}
+                        className={`w-full pill-button-secondary bg-white hover:bg-gray-50 flex items-center justify-center gap-3 transition-all h-[56px] border-[#D1D1D1] ${isLoading ? 'opacity-50 cursor-not-allowed' : 'active:scale-95'}`}
+                    >
+                        {isLoading ? (
+                            <>
+                                <Loader2 size={20} className="animate-spin text-[#121212]" />
+                                <span className="font-bold">Connecting...</span>
+                            </>
+                        ) : (
+                            <>
+                                {(() => {
+                                    const c = connectors.find(c => c.id === "argentX") || connectors.find(c => c.id === "argentMobile");
+                                    if (c?.icon) {
+                                        const iconSrc = typeof c.icon === 'string' ? c.icon : (c.icon as any).light || (c.icon as any).dark;
+                                        return <img src={iconSrc} alt="Ready" className="w-6 h-6" />;
+                                    }
+                                    return null;
+                                })()}
+                                <span className="font-bold">Connect Ready Wallet (formerly Argent)</span>
+                            </>
+                        )}
+                    </button>
+
+                    <button
+                        onClick={() => {
+                            const c = connectors.find(c => c.id === "braavos");
+                            if (c) connect({ connector: c });
+                        }}
+                        disabled={isLoading}
+                        className={`w-full pill-button-secondary bg-white hover:bg-gray-50 flex items-center justify-center gap-3 transition-all h-[56px] border-[#D1D1D1] ${isLoading ? 'opacity-50 cursor-not-allowed' : 'active:scale-95'}`}
+                    >
+                        {isLoading ? (
+                            <>
+                                <Loader2 size={20} className="animate-spin text-[#121212]" />
+                                <span className="font-bold">Connecting...</span>
+                            </>
+                        ) : (
+                            <>
+                                {(() => {
+                                    const c = connectors.find(c => c.id === "braavos");
+                                    if (c?.icon) {
+                                        const iconSrc = typeof c.icon === 'string' ? c.icon : (c.icon as any).light || (c.icon as any).dark;
+                                        return <img src={iconSrc} alt="Braavos" className="w-6 h-6" />;
+                                    }
+                                    return null;
+                                })()}
+                                <span className="font-bold">Connect Braavos</span>
+                            </>
+                        )}
+                    </button>
                 </div>
 
                 <div className="mt-8 pt-8 border-t border-gray-100">
