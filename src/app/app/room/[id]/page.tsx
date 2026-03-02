@@ -203,7 +203,7 @@ function RoomInterface({
     const { account } = useAccount();
 
     const vaultDeployed = ROOM_VAULT_ADDRESS !== "PLACEHOLDER_ROOM_VAULT_ADDRESS";
-    const { data: vaultRawBalance, refetch: refetchVault } = useReadContract({
+    const { data: vaultRawBalance, refetch: refetchVault, isFetching: vaultFetching } = useReadContract({
         abi: ROOM_VAULT_ABI,
         address: ROOM_VAULT_ADDRESS as `0x${string}`,
         functionName: "get_balance",
@@ -460,8 +460,17 @@ function RoomInterface({
                     onClick={() => openSendUsdc()}
                     title="Click to send STRK"
                 >
-                    <Coins size={13} className="text-yellow-400" />
-                    <span className="text-[12px] font-bold text-yellow-300">{vaultBalance} {TOKEN_SYMBOL}</span>
+                    {txStatus === 'pending' || vaultFetching ? (
+                        <>
+                            <Loader2 size={13} className="animate-spin text-yellow-400" />
+                            <span className="text-[12px] font-bold text-yellow-300 opacity-80 animate-pulse">Updating...</span>
+                        </>
+                    ) : (
+                        <>
+                            <Coins size={13} className="text-yellow-400" />
+                            <span className="text-[12px] font-bold text-yellow-300">{vaultBalance} {TOKEN_SYMBOL}</span>
+                        </>
+                    )}
                 </div>
             </div>
 

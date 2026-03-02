@@ -379,7 +379,7 @@ function WalletDrawer({ isOpen, onClose }: { isOpen: boolean, onClose: () => voi
 
     // Read Room Vault on-chain balance
     const vaultDeployed = ROOM_VAULT_ADDRESS !== "PLACEHOLDER_ROOM_VAULT_ADDRESS";
-    const { data: vaultRawBalance, refetch: refetchVault } = useReadContract({
+    const { data: vaultRawBalance, refetch: refetchVault, isFetching: vaultFetching } = useReadContract({
         abi: ROOM_VAULT_ABI,
         address: ROOM_VAULT_ADDRESS as `0x${string}`,
         functionName: "get_balance",
@@ -556,7 +556,14 @@ function WalletDrawer({ isOpen, onClose }: { isOpen: boolean, onClose: () => voi
                                 {/* Main balance = on-chain Room Vault balance */}
                                 <div className="flex flex-col relative z-10 gap-1">
                                     <div className="flex items-baseline gap-3">
-                                        <span className="text-[36px] font-black">{vaultBalance}</span>
+                                        {vaultFetching || depositStatus === 'pending' || sendStatus === 'pending' || withdrawStatus === 'pending' ? (
+                                            <div className="flex items-center gap-3 h-[43px]">
+                                                <Loader2 size={28} className="animate-spin text-yellow-400" />
+                                                <span className="text-[20px] font-bold text-gray-400 animate-pulse">Updating...</span>
+                                            </div>
+                                        ) : (
+                                            <span className="text-[36px] font-black">{vaultBalance}</span>
+                                        )}
                                         <span className="text-yellow-400 font-bold">STRK</span>
                                     </div>
                                     <p className="text-[12px] text-gray-500">Held in Room smart contract</p>
