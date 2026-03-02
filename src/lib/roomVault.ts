@@ -4,7 +4,7 @@
  * UPDATE ROOM_VAULT_ADDRESS after running contracts/deploy_room_vault.sh
  */
 
-export const ROOM_VAULT_ADDRESS = "PLACEHOLDER_ROOM_VAULT_ADDRESS";
+export const ROOM_VAULT_ADDRESS: string = "0x06b63f121bb2e9558a5ef114e304903c41d2136f2931b6f6174896b02ec4c1d5";
 
 export const STRK_ADDRESS = "0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d";
 

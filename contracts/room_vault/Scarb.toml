@@ -1,10 +1,11 @@
 [package]
 name = "room_vault"
 version = "0.1.0"
-edition = "2024_07"
+edition = "2023_11"
 
 [dependencies]
 starknet = ">=2.8.2"
 
 [[target.starknet-contract]]
 sierra = true
+casm = true
