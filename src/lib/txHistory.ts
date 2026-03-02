@@ -10,7 +10,7 @@ export interface TxRecord {
     amount: string;     // human-readable e.g. "1.5"
     symbol: string;     // e.g. "STRK"
     timestamp: number;  // Unix ms
-    direction: "sent" | "received";
+    direction: "sent" | "received" | "deposit" | "withdraw";
 }
 
 function storageKey(walletAddress: string) {

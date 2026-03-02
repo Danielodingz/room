@@ -29,6 +29,8 @@ import {
     Check,
     ArrowRight,
     ArrowLeft,
+    ArrowUp,
+    ArrowDown,
     Loader2,
     ExternalLink,
 } from "lucide-react";
@@ -417,6 +419,19 @@ function WalletDrawer({ isOpen, onClose }: { isOpen: boolean, onClose: () => voi
             }]);
             setWithdrawTxHash(result.transaction_hash);
             setWithdrawStatus("success");
+            if (address) {
+                saveTx(address, {
+                    txHash: result.transaction_hash,
+                    from: "Room Vault",
+                    fromAddress: ROOM_VAULT_ADDRESS,
+                    to: "My Wallet",
+                    toAddress: address,
+                    amount: amount.toString(),
+                    symbol: "STRK",
+                    timestamp: Date.now(),
+                    direction: "withdraw"
+                });
+            }
             refetchVault();
         } catch (err: any) {
             setWithdrawError(err?.message || "Withdrawal failed");
@@ -451,6 +466,19 @@ function WalletDrawer({ isOpen, onClose }: { isOpen: boolean, onClose: () => voi
                 }
             ]);
             setDepositStatus("success");
+            if (address) {
+                saveTx(address, {
+                    txHash: result.transaction_hash,
+                    from: "My Wallet",
+                    fromAddress: address,
+                    to: "Room Vault",
+                    toAddress: ROOM_VAULT_ADDRESS,
+                    amount: amount.toString(),
+                    symbol: "STRK",
+                    timestamp: Date.now(),
+                    direction: "deposit"
+                });
+            }
             refetchVault();
         } catch (err: any) {
             setDepositError(err?.message || "Deposit failed");
@@ -607,36 +635,50 @@ function WalletDrawer({ isOpen, onClose }: { isOpen: boolean, onClose: () => voi
                                     </div>
                                 ) : (
                                     <div className="flex flex-col gap-3">
-                                        {txHistory.map((tx, i) => (
-                                            <div key={`${tx.txHash}-${i}`} className="bg-white/[0.03] border border-white/5 rounded-2xl p-4 flex items-center gap-3 hover:bg-white/[0.05] transition-colors">
-                                                <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${tx.direction === 'sent' ? 'bg-red-500/10' : 'bg-green-500/10'}`}>
-                                                    {tx.direction === 'sent'
-                                                        ? <ArrowRight size={18} className="text-red-400" />
-                                                        : <ArrowLeft size={18} className="text-green-400" />}
+                                        {txHistory.map((tx, i) => {
+                                            const isOut = tx.direction === 'sent' || tx.direction === 'withdraw';
+                                            const isDep = tx.direction === 'deposit';
+                                            const isWth = tx.direction === 'withdraw';
+
+                                            const bgColor = isOut && !isWth ? 'bg-red-500/10' : (isWth ? 'bg-gray-500/10' : 'bg-green-500/10');
+                                            const textColor = isOut && !isWth ? 'text-red-400' : (isWth ? 'text-gray-400' : 'text-green-400');
+                                            const Icon = isDep ? ArrowDown : (isWth ? ArrowUp : (isOut ? ArrowRight : ArrowLeft));
+
+                                            let title = "";
+                                            if (tx.direction === 'sent') title = `→ @${tx.to}`;
+                                            else if (tx.direction === 'received') title = `← @${tx.from}`;
+                                            else if (tx.direction === 'deposit') title = `Deposit to Vault`;
+                                            else title = `Withdraw to Wallet`;
+
+                                            return (
+                                                <div key={`${tx.txHash}-${i}`} className="bg-white/[0.03] border border-white/5 rounded-2xl p-4 flex items-center gap-3 hover:bg-white/[0.05] transition-colors">
+                                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${bgColor}`}>
+                                                        <Icon size={18} className={textColor} />
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="text-[14px] font-bold text-white truncate">
+                                                            {title}
+                                                        </p>
+                                                        <p className="text-[11px] text-gray-500">{new Date(tx.timestamp).toLocaleString()}</p>
+                                                    </div>
+                                                    <div className="flex flex-col items-end shrink-0">
+                                                        <span className={`text-[14px] font-black ${textColor}`}>
+                                                            {isOut ? '-' : '+'}{tx.amount} {tx.symbol}
+                                                        </span>
+                                                        {tx.txHash && (
+                                                            <a
+                                                                href={`https://sepolia.voyager.online/tx/${tx.txHash}`}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                className="text-[10px] text-blue-400 hover:text-blue-300"
+                                                            >
+                                                                View ↗
+                                                            </a>
+                                                        )}
+                                                    </div>
                                                 </div>
-                                                <div className="flex-1 min-w-0">
-                                                    <p className="text-[14px] font-bold text-white truncate">
-                                                        {tx.direction === 'sent' ? `→ @${tx.to}` : `← @${tx.from}`}
-                                                    </p>
-                                                    <p className="text-[11px] text-gray-500">{new Date(tx.timestamp).toLocaleString()}</p>
-                                                </div>
-                                                <div className="flex flex-col items-end shrink-0">
-                                                    <span className={`text-[14px] font-black ${tx.direction === 'sent' ? 'text-red-400' : 'text-green-400'}`}>
-                                                        {tx.direction === 'sent' ? '-' : '+'}{tx.amount} {tx.symbol}
-                                                    </span>
-                                                    {tx.txHash && (
-                                                        <a
-                                                            href={`https://sepolia.voyager.online/tx/${tx.txHash}`}
-                                                            target="_blank"
-                                                            rel="noopener noreferrer"
-                                                            className="text-[10px] text-blue-400 hover:text-blue-300"
-                                                        >
-                                                            View ↗
-                                                        </a>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        ))}
+                                            );
+                                        })}
                                     </div>
                                 )}
                             </div>
