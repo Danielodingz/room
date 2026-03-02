@@ -8,12 +8,13 @@ import {
     argent,
     braavos,
     useInjectedConnectors,
-    voyager
+    voyager,
 } from "@starknet-react/core";
+import { ArgentMobileConnector } from "starknetkit/argentMobile";
 import { WebWalletConnector } from "starknetkit/webwallet";
 
 export function StarknetProvider({ children }: { children: React.ReactNode }) {
-    const { connectors } = useInjectedConnectors({
+    const { connectors: injected } = useInjectedConnectors({
         // Add connectors in the order you want them to appear
         recommended: [
             argent(),
@@ -25,9 +26,18 @@ export function StarknetProvider({ children }: { children: React.ReactNode }) {
         order: "random"
     });
 
-    // Combine Injected (Extensions) with the Web Wallet (Universal Fallback)
+    // Combine Injected (Extensions) with the Mobile and Web Wallet (Universal Fallback)
     const allConnectors = [
-        ...connectors,
+        ...injected,
+        ArgentMobileConnector.init({
+            options: {
+                dappName: "Room",
+                projectId: "e93f77341fe2cb1fc0c9d72c1c7af06e", // Standard default project ID or yours
+                chainId: "SN_SEPOLIA",
+                description: "Room - Starknet Native Video Meetings",
+                url: typeof window !== 'undefined' ? window.location.origin : "https://room.starknet",
+            }
+        }),
         new WebWalletConnector({ url: "https://web.argent.xyz" })
     ];
 
