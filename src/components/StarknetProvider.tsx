@@ -43,7 +43,7 @@ export function StarknetProvider({ children }: { children: React.ReactNode }) {
     const provider = jsonRpcProvider({
         rpc: () => ({
             nodeUrl: process.env.NEXT_PUBLIC_STARKNET_RPC_URL ||
-                "https://starknet-sepolia.public.blastapi.io/rpc/v0_8"
+                "https://starknet-sepolia.g.alchemy.com/starknet/version/rpc/v0_8/demo"
         })
     });
 
