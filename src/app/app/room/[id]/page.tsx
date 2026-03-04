@@ -192,6 +192,21 @@ export default function MeetingRoomPage() {
     );
 }
 
+// ─── Error message parser ─────────────────────────────────────────────────────
+function parseStarknetError(err: any): string {
+    const msg: string = err?.message || err?.toString() || "Transaction failed";
+    if (msg.includes("is not deployed"))
+        return "The recipient's wallet is not yet activated on Starknet. They need to make at least one transaction on Sepolia to activate their account.";
+    if (msg.includes("insufficient") || msg.includes("balance"))
+        return "Insufficient vault balance to complete this transfer.";
+    if (msg.includes("rejected") || msg.includes("cancelled") || msg.includes("user abort"))
+        return "Transaction was rejected or cancelled.";
+    if (msg.includes("execution has failed"))
+        return "Transaction execution failed on-chain. Make sure both wallets are activated on Starknet Sepolia.";
+    // Return a shortened version for other errors
+    return msg.length > 180 ? msg.slice(0, 180) + "…" : msg;
+}
+
 // ─── Room Interface ────────────────────────────────────────────────────────────
 function RoomInterface({
     meetingId,
@@ -401,7 +416,7 @@ function RoomInterface({
             sendPaymentNotif(new TextEncoder().encode(notifPayload), { reliable: true });
         } catch (err: any) {
             console.error("Token send error:", err);
-            setTxError(err?.message || "Transaction failed");
+            setTxError(parseStarknetError(err));
             setTxStatus("error");
         }
     };
