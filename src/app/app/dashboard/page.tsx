@@ -73,9 +73,15 @@ export default function DashboardPage() {
 
     // Redirect to landing page only if definitely not connected or trying to connect
     useEffect(() => {
+        let timer: NodeJS.Timeout;
         if (!isConnected && !isConnecting && !isReconnecting) {
-            router.push("/");
+            timer = setTimeout(() => {
+                router.push("/");
+            }, 1000); // Give the wallet adapter time to initialize on reload
         }
+        return () => {
+            if (timer) clearTimeout(timer);
+        };
     }, [isConnected, isConnecting, isReconnecting, router]);
 
     const shortenedAddress = address

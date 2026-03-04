@@ -47,7 +47,7 @@ export default function MeetingRoomPage() {
     const searchParams = useSearchParams();
     const meetingId = params.id as string;
     const mode = searchParams.get("mode");
-    const { address, isConnected } = useAccount();
+    const { address, isConnected, isConnecting: isWalletConnecting, isReconnecting: isWalletReconnecting } = useAccount();
 
     const [token, setToken] = useState("");
     const [liveKitUrl, setLiveKitUrl] = useState("");
@@ -61,10 +61,16 @@ export default function MeetingRoomPage() {
     const [initialVideoEnabled, setInitialVideoEnabled] = useState(true);
 
     useEffect(() => {
-        if (!isConnected) {
-            router.push("/");
+        let timer: NodeJS.Timeout;
+        if (!isConnected && !isWalletConnecting && !isWalletReconnecting) {
+            timer = setTimeout(() => {
+                router.push("/");
+            }, 1000); // Give the wallet adapter time to initialize on reload
         }
-    }, [isConnected, router]);
+        return () => {
+            if (timer) clearTimeout(timer);
+        };
+    }, [isConnected, isWalletConnecting, isWalletReconnecting, router]);
 
     useEffect(() => {
         const fetchToken = async () => {
