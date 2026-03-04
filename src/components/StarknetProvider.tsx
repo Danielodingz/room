@@ -15,35 +15,36 @@ import { WebWalletConnector } from "starknetkit/webwallet";
 
 export function StarknetProvider({ children }: { children: React.ReactNode }) {
     const { connectors: injected } = useInjectedConnectors({
-        // Add connectors in the order you want them to appear
         recommended: [
             argent(),
             braavos(),
         ],
-        // Include any other connectors as as fallback
         includeRecommended: "always",
-        // Randomize the order of the connectors
         order: "random"
     });
 
-    // Combine Injected (Extensions) with the Mobile and Web Wallet (Universal Fallback)
+    const argentMobile = ArgentMobileConnector.init({
+        options: {
+            dappName: "Room",
+            projectId: "e93f77341fe2cb1fc0c9d72c1c7af06e",
+            chainId: "SN_SEPOLIA",
+            description: "Room - Starknet Native Video Meetings",
+            url: typeof window !== "undefined" ? window.location.origin : "https://room-tau-ivory.vercel.app",
+        }
+    });
+
+    // Put argentMobile first so mobile devices hit it before injected extensions
     const allConnectors = [
+        argentMobile,
         ...injected,
-        ArgentMobileConnector.init({
-            options: {
-                dappName: "Room",
-                projectId: "e93f77341fe2cb1fc0c9d72c1c7af06e", // Standard default project ID or yours
-                chainId: "SN_SEPOLIA",
-                description: "Room - Starknet Native Video Meetings",
-                url: typeof window !== 'undefined' ? window.location.origin : "https://room.starknet",
-            }
-        }),
         new WebWalletConnector({ url: "https://web.argent.xyz" })
     ];
 
-    // Use official Starknet Foundation Sepolia RPC (publicProvider's Blast API is defunct)
     const provider = jsonRpcProvider({
-        rpc: () => ({ nodeUrl: "https://starknet-sepolia.g.alchemy.com/starknet/version/rpc/v0_8/demo" })
+        rpc: () => ({
+            nodeUrl: process.env.NEXT_PUBLIC_STARKNET_RPC_URL ||
+                "https://starknet-sepolia.public.blastapi.io/rpc/v0_8"
+        })
     });
 
     return (
@@ -52,6 +53,7 @@ export function StarknetProvider({ children }: { children: React.ReactNode }) {
             provider={provider}
             connectors={allConnectors}
             explorer={voyager}
+            autoConnect
         >
             {children}
         </StarknetConfig>
