@@ -33,6 +33,7 @@ import {
     ArrowDown,
     Loader2,
     ExternalLink,
+    RefreshCw,
 } from "lucide-react";
 
 export default function DashboardPage() {
@@ -603,9 +604,19 @@ function WalletDrawer({ isOpen, onClose }: { isOpen: boolean, onClose: () => voi
                                         </div>
                                         <span className="text-[13px] font-medium uppercase tracking-wider text-yellow-400">Room Wallet</span>
                                     </div>
-                                    {!vaultDeployed && (
-                                        <span className="text-[10px] text-orange-400 bg-orange-500/10 border border-orange-500/20 px-2 py-0.5 rounded-full">Contract pending</span>
-                                    )}
+                                    <div className="flex items-center gap-2">
+                                        {!vaultDeployed && (
+                                            <span className="text-[10px] text-orange-400 bg-orange-500/10 border border-orange-500/20 px-2 py-0.5 rounded-full">Contract pending</span>
+                                        )}
+                                        <button
+                                            onClick={() => refetchVault()}
+                                            disabled={vaultFetching}
+                                            title="Refresh balance"
+                                            className={`p-1.5 rounded-lg transition-all hover:bg-white/10 text-gray-400 hover:text-yellow-400 ${vaultFetching ? 'opacity-50 cursor-not-allowed' : 'active:scale-90'}`}
+                                        >
+                                            <RefreshCw size={14} className={vaultFetching ? 'animate-spin text-yellow-400' : ''} />
+                                        </button>
+                                    </div>
                                 </div>
 
                                 {/* Main balance = on-chain Room Vault balance */}
