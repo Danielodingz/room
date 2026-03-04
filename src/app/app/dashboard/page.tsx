@@ -40,6 +40,7 @@ export default function DashboardPage() {
     const { disconnect } = useDisconnect();
     const router = useRouter();
     const [currentTime, setCurrentTime] = useState(new Date());
+    const [hasMounted, setHasMounted] = useState(false);
     const [isWalletOpen, setIsWalletOpen] = useState(false);
     const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
     const [isNewMeetingOpen, setIsNewMeetingOpen] = useState(false);
@@ -71,33 +72,33 @@ export default function DashboardPage() {
         return () => clearInterval(timer);
     }, []);
 
-    // Redirect to landing page only if definitely not connected or trying to connect
+    // Mark component as mounted (so wallet adapter has had a full render cycle to reconnect)
     useEffect(() => {
-        let timer: NodeJS.Timeout;
+        setHasMounted(true);
+    }, []);
+
+    // Redirect to landing page only once mounted and definitely not connected
+    useEffect(() => {
+        if (!hasMounted) return; // Don't redirect until after first full render
         if (!isConnected && !isConnecting && !isReconnecting) {
-            timer = setTimeout(() => {
-                router.push("/");
-            }, 1000); // Give the wallet adapter time to initialize on reload
+            router.push("/");
         }
-        return () => {
-            if (timer) clearTimeout(timer);
-        };
-    }, [isConnected, isConnecting, isReconnecting, router]);
+    }, [hasMounted, isConnected, isConnecting, isReconnecting, router]);
 
     const shortenedAddress = address
         ? `${address.slice(0, 6)}...${address.slice(-4)}`
         : "";
 
-    if (!isConnected && !isConnecting && !isReconnecting) return null;
-
-    if (isConnecting || isReconnecting) {
+    if (!hasMounted || isConnecting || isReconnecting) {
         return (
             <main className="min-h-screen bg-[#0A0A0B] flex flex-col items-center justify-center text-white">
                 <Loader2 size={40} className="animate-spin text-white/50 mb-4" />
-                <p className="text-white/60 text-sm font-medium tracking-wide">Connecting wallet...</p>
+                <p className="text-white/60 text-sm font-medium tracking-wide">Loading...</p>
             </main>
         );
     }
+
+    if (!isConnected) return null;
 
     return (
         <main className="min-h-screen bg-[#0A0A0B] text-white font-sans flex flex-col md:flex-row pb-20 md:pb-0">

@@ -53,6 +53,7 @@ export default function MeetingRoomPage() {
     const [liveKitUrl, setLiveKitUrl] = useState("");
     const [isConnecting, setIsConnecting] = useState(false);
     const [connectionError, setConnectionError] = useState("");
+    const [hasMounted, setHasMounted] = useState(false);
 
     // Pre-Join States
     const [preJoinComplete, setPreJoinComplete] = useState(false);
@@ -60,17 +61,17 @@ export default function MeetingRoomPage() {
     const [initialMicEnabled, setInitialMicEnabled] = useState(true);
     const [initialVideoEnabled, setInitialVideoEnabled] = useState(true);
 
+    // Mark mounted so wallet adapter has had a full render cycle to reconnect
     useEffect(() => {
-        let timer: NodeJS.Timeout;
+        setHasMounted(true);
+    }, []);
+
+    useEffect(() => {
+        if (!hasMounted) return;
         if (!isConnected && !isWalletConnecting && !isWalletReconnecting) {
-            timer = setTimeout(() => {
-                router.push("/");
-            }, 1000); // Give the wallet adapter time to initialize on reload
+            router.push("/");
         }
-        return () => {
-            if (timer) clearTimeout(timer);
-        };
-    }, [isConnected, isWalletConnecting, isWalletReconnecting, router]);
+    }, [hasMounted, isConnected, isWalletConnecting, isWalletReconnecting, router]);
 
     useEffect(() => {
         const fetchToken = async () => {
