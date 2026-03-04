@@ -8,7 +8,7 @@ import {
     Mic, MicOff, Video, VideoOff, Users, MessageSquare, Smile,
     ScreenShare, MoreHorizontal, PhoneOff, Maximize2,
     ChevronUp, X, MessageCircle, Paperclip, SmilePlus, Send,
-    ShieldCheck, Gift, Coins, Loader2, Hand, CheckCircle2, AlertCircle,
+    ShieldCheck, Gift, Loader2, Hand, CheckCircle2, AlertCircle,
     ExternalLink, AtSign, DollarSign
 } from "lucide-react";
 import { useAccount } from "@starknet-react/core";
@@ -474,7 +474,7 @@ function RoomInterface({
                         </>
                     ) : (
                         <>
-                            <Coins size={13} className="text-yellow-400" />
+                            <Image src="/assets/images/strk-logo.png" alt="STRK" width={13} height={13} className="object-contain" />
                             <span className="text-[12px] font-bold text-yellow-300">{vaultBalance} {TOKEN_SYMBOL}</span>
                         </>
                     )}
@@ -496,7 +496,7 @@ function RoomInterface({
             {/* ── Payment received banner ── */}
             {paymentNotif && (
                 <div className="absolute top-16 md:top-20 right-2 md:right-6 z-50 animate-in slide-in-from-right duration-300 bg-yellow-500/90 text-black px-4 py-3 rounded-2xl flex items-center gap-3 shadow-2xl backdrop-blur-md border border-yellow-400">
-                    <Coins size={20} className="text-black" />
+                    <Image src="/assets/images/strk-logo.png" alt="STRK" width={20} height={20} className="object-contain" />
                     <div>
                         <p className="text-[13px] font-black">You received {paymentNotif.amount} {TOKEN_SYMBOL}!</p>
                         <p className="text-[11px] font-bold opacity-70">from {paymentNotif.from}</p>
@@ -708,7 +708,7 @@ function RoomInterface({
                     {/* ── Send USDC Button ── */}
                     <div className="relative">
                         <ControlButton
-                            icon={<Coins className="text-yellow-400" />}
+                            icon={<Image src="/assets/images/strk-logo.png" alt="STRK" width={22} height={22} className="object-contain" />}
                             label="Send USDC"
                             onClick={() => openSendUsdc()}
                         />
@@ -758,7 +758,7 @@ function RoomInterface({
                         <div className="flex items-center justify-between p-6 border-b border-white/5">
                             <div className="flex items-center gap-3">
                                 <div className="w-10 h-10 bg-yellow-500/10 rounded-xl flex items-center justify-center">
-                                    <Coins size={20} className="text-yellow-400" />
+                                    <Image src="/assets/images/strk-logo.png" alt="STRK" width={20} height={20} className="object-contain" />
                                 </div>
                                 <div>
                                     <h2 className="text-[17px] font-bold">Send STRK</h2>
@@ -907,7 +907,7 @@ function RoomInterface({
                                             </>
                                         ) : (
                                             <>
-                                                <Coins size={18} />
+                                                <Image src="/assets/images/strk-logo.png" alt="STRK" width={18} height={18} className="object-contain" />
                                                 Send {customAmount || usdcAmount} {TOKEN_SYMBOL}
                                                 {usdcRecipient && ` → @${usdcRecipient.name}`}
                                             </>
