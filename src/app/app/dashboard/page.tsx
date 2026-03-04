@@ -23,7 +23,6 @@ import {
     ChevronLeft,
     Wallet,
     Zap,
-    DollarSign,
     Bell,
     Copy,
     Check,
@@ -594,7 +593,7 @@ function WalletDrawer({ isOpen, onClose }: { isOpen: boolean, onClose: () => voi
                             {/* Room Wallet Balance Card */}
                             <div className="bg-[#1C1C1E] rounded-[32px] p-6 border border-white/5 flex flex-col gap-6 shadow-xl relative overflow-hidden group">
                                 <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                                    <DollarSign size={80} className="text-yellow-500" />
+                                    <Image src="/assets/images/strk.png" alt="STRK" width={80} height={80} className="object-contain" />
                                 </div>
 
                                 <div className="flex items-center justify-between relative z-10">
