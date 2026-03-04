@@ -632,10 +632,7 @@ function WalletDrawer({ isOpen, onClose }: { isOpen: boolean, onClose: () => voi
                                         )}
                                         <span className="text-yellow-400 font-bold">STRK</span>
                                     </div>
-                                    <p className="text-[12px] text-gray-500">Held in Room smart contract</p>
-                                    <p className="text-[12px] text-gray-600 mt-1">
-                                        Argent wallet: {balanceLoading ? "Loading..." : `${strkFormatted} STRK`}
-                                    </p>
+
                                 </div>
 
                                 <div className="flex gap-3 relative z-10">
