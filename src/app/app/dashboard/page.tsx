@@ -49,6 +49,15 @@ export default function DashboardPage() {
     const [isPublicMeeting, setIsPublicMeeting] = useState(true);
     const [meetingId] = useState(Math.random().toString(36).substring(2, 11).toUpperCase());
     const [meetingIdCopied, setMeetingIdCopied] = useState(false);
+    const [txHistory, setTxHistory] = useState<TxRecord[]>([]);
+
+    const reloadTxHistory = () => {
+        if (address) setTxHistory(loadTxHistory(address));
+    };
+
+    useEffect(() => {
+        reloadTxHistory();
+    }, [address, isWalletOpen, isNotificationsOpen]);
 
     const handleCopyMeetingId = (e: React.MouseEvent) => {
         e.stopPropagation();
@@ -166,13 +175,17 @@ export default function DashboardPage() {
                     </div>
 
                     <div className="flex items-center gap-2 md:gap-4">
-                        <button
-                            onClick={() => setIsNotificationsOpen(true)}
-                            className="relative p-2 text-gray-500 hover:text-blue-400 hover:bg-white/5 rounded-xl transition-all group"
-                        >
-                            <Bell size={20} />
-                            <span className="absolute top-2 right-2 w-2 h-2 bg-blue-500 rounded-full border-2 border-[#0A0A0B] group-hover:border-[#111112] transition-all" />
-                        </button>
+                        <div className="relative">
+                            <button
+                                onClick={() => setIsNotificationsOpen(true)}
+                                className="relative p-2 text-gray-500 hover:text-blue-400 hover:bg-white/5 rounded-xl transition-all group"
+                            >
+                                <Bell size={20} />
+                                {txHistory.some(tx => tx.direction === 'received' || tx.direction === 'deposit') && (
+                                    <span className="absolute top-2 right-2 w-2 h-2 bg-blue-500 rounded-full border-2 border-[#0A0A0B] group-hover:border-[#111112] transition-all" />
+                                )}
+                            </button>
+                        </div>
                         <div
                             onClick={() => setIsWalletOpen(true)}
                             className="hidden md:flex items-center gap-2 px-4 py-2 bg-white/5 rounded-xl border border-white/10 shadow-sm hover:border-white/20 transition-all cursor-pointer"
@@ -330,8 +343,8 @@ export default function DashboardPage() {
                 </div>
 
                 {/* Drawer Overlays */}
-                <WalletDrawer isOpen={isWalletOpen} onClose={() => setIsWalletOpen(false)} />
-                <NotificationDrawer isOpen={isNotificationsOpen} onClose={() => setIsNotificationsOpen(false)} />
+                <WalletDrawer isOpen={isWalletOpen} onClose={() => setIsWalletOpen(false)} txHistory={txHistory} reloadTxHistory={reloadTxHistory} />
+                <NotificationDrawer isOpen={isNotificationsOpen} onClose={() => setIsNotificationsOpen(false)} txHistory={txHistory} />
             </div>
         </main>
     );
@@ -388,11 +401,10 @@ function LargeActionButton({ icon, label, color, description, hasDropdown = fals
     );
 }
 
-function WalletDrawer({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) {
+function WalletDrawer({ isOpen, onClose, txHistory, reloadTxHistory }: { isOpen: boolean, onClose: () => void, txHistory: TxRecord[], reloadTxHistory: () => void }) {
     const { address, account } = useAccount();
-    const [view, setView] = useState<'home' | 'send' | 'receive' | 'deposit'>('home');
+    const [view, setView] = useState<'home' | 'send' | 'receive' | 'deposit' | 'history'>('home');
     const [copied, setCopied] = useState(false);
-    const [txHistory, setTxHistory] = useState<TxRecord[]>([]);
 
     // Send state
     const [sendTo, setSendTo] = useState("");
@@ -514,7 +526,7 @@ function WalletDrawer({ isOpen, onClose }: { isOpen: boolean, onClose: () => voi
     };
     // Load tx history from localStorage
     useEffect(() => {
-        if (address) setTxHistory(loadTxHistory(address));
+        reloadTxHistory();
     }, [address, isOpen, sendStatus]); // re-load after sends too
 
     // Reset send form when switching views
@@ -669,7 +681,7 @@ function WalletDrawer({ isOpen, onClose }: { isOpen: boolean, onClose: () => voi
                                     </div>
                                 ) : (
                                     <div className="flex flex-col gap-3">
-                                        {txHistory.map((tx, i) => {
+                                        {txHistory.slice(0, 3).map((tx, i) => {
                                             const isOut = tx.direction === 'sent' || tx.direction === 'withdraw';
                                             const isDep = tx.direction === 'deposit';
                                             const isWth = tx.direction === 'withdraw';
@@ -713,8 +725,72 @@ function WalletDrawer({ isOpen, onClose }: { isOpen: boolean, onClose: () => voi
                                                 </div>
                                             );
                                         })}
+                                        {txHistory.length > 3 && (
+                                            <button
+                                                onClick={() => setView('history')}
+                                                className="w-full text-center py-3 text-[13px] font-bold text-blue-400 hover:text-blue-300 hover:bg-white/[0.02] rounded-xl transition-colors mt-2"
+                                            >
+                                                See all history →
+                                            </button>
+                                        )}
                                     </div>
                                 )}
+                            </div>
+                        </div>
+                    )}
+
+                    {view === 'history' && (
+                        <div className="flex flex-col gap-6 animate-in fade-in slide-in-from-right-4 duration-500">
+                            <div>
+                                <h1 className="text-[40px] font-extrabold leading-[1.1] tracking-tight mb-2">History</h1>
+                                <p className="text-gray-500 font-medium">All your Room transaction history.</p>
+                            </div>
+
+                            <div className="flex flex-col gap-3">
+                                {txHistory.map((tx, i) => {
+                                    const isOut = tx.direction === 'sent' || tx.direction === 'withdraw';
+                                    const isDep = tx.direction === 'deposit';
+                                    const isWth = tx.direction === 'withdraw';
+
+                                    const bgColor = isOut && !isWth ? 'bg-red-500/10' : (isWth ? 'bg-gray-500/10' : 'bg-green-500/10');
+                                    const textColor = isOut && !isWth ? 'text-red-400' : (isWth ? 'text-gray-400' : 'text-green-400');
+                                    const Icon = isDep ? ArrowDown : (isWth ? ArrowUp : (isOut ? ArrowRight : ArrowLeft));
+
+                                    let title = "";
+                                    if (tx.direction === 'sent') title = `→ @${tx.to}`;
+                                    else if (tx.direction === 'received') title = `← @${tx.from}`;
+                                    else if (tx.direction === 'deposit') title = `Deposit to Vault`;
+                                    else title = `Withdraw to Wallet`;
+
+                                    return (
+                                        <div key={`hist-${tx.txHash}-${i}`} className="bg-white/[0.03] border border-white/5 rounded-2xl p-4 flex items-center gap-3 hover:bg-white/[0.05] transition-colors">
+                                            <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${bgColor}`}>
+                                                <Icon size={18} className={textColor} />
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-[14px] font-bold text-white truncate">
+                                                    {title}
+                                                </p>
+                                                <p className="text-[11px] text-gray-500">{new Date(tx.timestamp).toLocaleString()}</p>
+                                            </div>
+                                            <div className="flex flex-col items-end shrink-0">
+                                                <span className={`text-[14px] font-black ${textColor}`}>
+                                                    {isOut ? '-' : '+'}{tx.amount} {tx.symbol}
+                                                </span>
+                                                {tx.txHash && (
+                                                    <a
+                                                        href={`https://sepolia.voyager.online/tx/${tx.txHash}`}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="text-[10px] text-blue-400 hover:text-blue-300"
+                                                    >
+                                                        View ↗
+                                                    </a>
+                                                )}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
                             </div>
                         </div>
                     )}
@@ -973,7 +1049,9 @@ function WalletDrawer({ isOpen, onClose }: { isOpen: boolean, onClose: () => voi
     );
 }
 
-function NotificationDrawer({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) {
+function NotificationDrawer({ isOpen, onClose, txHistory }: { isOpen: boolean, onClose: () => void, txHistory: TxRecord[] }) {
+    const notifications = txHistory.filter(tx => tx.direction === 'received' || tx.direction === 'deposit');
+
     return (
         <div className={`absolute inset-0 z-50 transition-all duration-500 flex justify-end ${isOpen ? "visible" : "invisible pointer-events-none"}`}>
             {/* Backdrop Blur */}
@@ -984,9 +1062,9 @@ function NotificationDrawer({ isOpen, onClose }: { isOpen: boolean, onClose: () 
 
             {/* Drawer Panel */}
             <div className={`w-full md:w-auto md:min-w-[440px] max-w-[100vw] bg-[#0E0E10] h-full shadow-2xl border-l border-white/5 relative z-10 transition-transform duration-500 transform ${isOpen ? "translate-x-0" : "translate-x-full"} flex flex-col`}>
-                <div className="p-5 md:p-8 flex flex-col gap-8 h-full overflow-y-auto custom-scrollbar">
+                <div className="p-5 md:p-8 flex flex-col gap-8 h-full overflow-hidden">
                     {/* Header */}
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between shrink-0">
                         <h2 className="text-[24px] font-bold">Notifications</h2>
                         <button
                             onClick={onClose}
@@ -996,34 +1074,54 @@ function NotificationDrawer({ isOpen, onClose }: { isOpen: boolean, onClose: () 
                         </button>
                     </div>
 
-                    {/* Empty State */}
-                    <div className="flex-1 flex flex-col items-center justify-center py-20 gap-6 text-center">
-                        <div className="relative">
-                            <div className="w-24 h-24 bg-blue-500/10 rounded-full flex items-center justify-center border border-blue-500/20 shadow-2xl">
-                                <Bell size={40} className="text-blue-400 animate-pulse" />
+                    {/* Notifications List or Empty State */}
+                    {notifications.length === 0 ? (
+                        <div className="flex-1 flex flex-col items-center justify-center py-20 gap-6 text-center">
+                            <div className="relative">
+                                <div className="w-24 h-24 bg-blue-500/10 rounded-full flex items-center justify-center border border-blue-500/20 shadow-2xl">
+                                    <Bell size={40} className="text-blue-400 animate-pulse" />
+                                </div>
                             </div>
-                            <div className="absolute -top-1 -right-1 w-6 h-6 bg-blue-500 rounded-full border-4 border-[#0E0E10]" />
-                        </div>
 
-                        <div className="space-y-2">
-                            <h3 className="text-[20px] font-bold text-white">All caught up!</h3>
-                            <p className="text-gray-500 max-w-[260px] mx-auto text-[15px] leading-relaxed">
-                                You don't have any new notifications at the moment. We'll let you know when something important happens.
-                            </p>
-                        </div>
+                            <div className="space-y-2">
+                                <h3 className="text-[20px] font-bold text-white">All caught up!</h3>
+                                <p className="text-gray-500 max-w-[260px] mx-auto text-[15px] leading-relaxed">
+                                    You don't have any new notifications at the moment. We'll let you know when something important happens.
+                                </p>
+                            </div>
 
-                        <button
-                            onClick={onClose}
-                            className="mt-4 px-6 py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-[14px] font-bold text-gray-300 transition-all active:scale-95"
-                        >
-                            Close Drawer
-                        </button>
-                    </div>
+                            <button
+                                onClick={onClose}
+                                className="mt-4 px-6 py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-[14px] font-bold text-gray-300 transition-all active:scale-95"
+                            >
+                                Close Drawer
+                            </button>
+                        </div>
+                    ) : (
+                        <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 flex flex-col gap-3">
+                            {notifications.map((tx, i) => (
+                                <div key={`notif-${tx.txHash}-${i}`} className="bg-[#1C1C1E] border border-white/5 rounded-2xl p-4 flex items-center gap-4 hover:border-white/10 transition-all">
+                                    <div className="w-12 h-12 rounded-full flex items-center justify-center bg-green-500/10 shrink-0 border border-green-500/20">
+                                        <ArrowDown size={20} className="text-green-400" />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-[14px] font-bold text-white">
+                                            {tx.direction === 'deposit' ? 'Vault Deposited' : 'Payment Received'}
+                                        </p>
+                                        <p className="text-[13px] text-gray-400 font-medium">
+                                            You received <span className="text-green-400 font-bold">+{tx.amount} {tx.symbol}</span> {tx.direction === 'deposit' ? 'from your wallet' : `from @${tx.from}`}
+                                        </p>
+                                        <p className="text-[11px] text-gray-500 mt-1">{new Date(tx.timestamp).toLocaleString()}</p>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
 
                     {/* Footer / Tip */}
-                    <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-4 text-center">
+                    <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-4 text-center shrink-0">
                         <p className="text-[12px] text-gray-600 font-medium italic">
-                            Tip: You can manage your notification preferences in Settings.
+                            These notifications represent all incoming transfers to your Room Vault.
                         </p>
                     </div>
                 </div>
