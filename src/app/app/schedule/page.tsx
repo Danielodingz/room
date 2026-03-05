@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAccount } from "@starknet-react/core";
 import Image from "next/image";
 import {
@@ -9,7 +9,7 @@ import {
     Radio, ChevronDown, Check, Loader2, CheckCircle2, Shield,
     FileText, Hash, Copy, ExternalLink, Link2, ImageIcon, X, Upload
 } from "lucide-react";
-import { saveScheduledMeeting, ScheduledMeeting } from "@/lib/scheduledMeetings";
+import { saveScheduledMeeting, loadScheduledMeetings, ScheduledMeeting } from "@/lib/scheduledMeetings";
 
 // Popular timezones list
 const TIMEZONES = [
@@ -77,6 +77,8 @@ function nextHalfHour() {
 
 export default function SchedulePage() {
     const router = useRouter();
+    const searchParams = useSearchParams();
+    const editId = searchParams.get("edit");
     const { address, isConnected, isConnecting, isReconnecting } = useAccount();
     const [hasMounted, setHasMounted] = useState(false);
 
@@ -120,6 +122,24 @@ export default function SchedulePage() {
         } catch { }
     }, []);
 
+    // Pre-fill form when editing an existing meeting
+    useEffect(() => {
+        if (!hasMounted || !editId || !address) return;
+        const existing = loadScheduledMeetings(address).find(m => m.id === editId);
+        if (!existing) return;
+        setTopic(existing.topic);
+        setDescription(existing.description);
+        setDate(existing.date);
+        setStartTime(existing.startTime);
+        setDuration(existing.duration);
+        setTimezone(existing.timezone);
+        setIsPublic(existing.isPublic);
+        setPasscode(existing.passcode || "");
+        setMaxParticipants(existing.maxParticipants);
+        setEnableRecording(existing.enableRecording);
+        if (existing.coverImage) setCoverImage(existing.coverImage);
+    }, [hasMounted, editId, address]);
+
     useEffect(() => {
         if (!hasMounted) return;
         if (!isConnected && !isConnecting && !isReconnecting) {
@@ -146,7 +166,8 @@ export default function SchedulePage() {
         if (!canSave || !address) return;
         setStatus("saving");
         const meeting: ScheduledMeeting = {
-            id: generateId(),
+            // When editing keep the original ID; otherwise generate a new one
+            id: editId || generateId(),
             topic: topic.trim(),
             description: description.trim(),
             date,
@@ -197,7 +218,7 @@ export default function SchedulePage() {
                     <div className="w-7 h-7 relative">
                         <Image src="/assets/logos/logo.png" alt="Room" fill className="object-contain" />
                     </div>
-                    <span className="font-bold text-[16px]">Schedule a Meeting</span>
+                    <span className="font-bold text-[16px]">{editId ? "Edit Meeting" : "Schedule a Meeting"}</span>
                 </div>
             </header>
 
@@ -648,7 +669,7 @@ export default function SchedulePage() {
                             >
                                 {status === "saving" && <Loader2 size={20} className="animate-spin" />}
                                 {status === "idle" && <Calendar size={20} />}
-                                {status === "saving" ? "Scheduling…" : "Schedule Meeting"}
+                                {status === "saving" ? (editId ? "Updating…" : "Scheduling…") : (editId ? "Update Meeting" : "Schedule Meeting")}
                             </button>
 
                             <p className="text-center text-[12px] text-gray-600">

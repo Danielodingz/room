@@ -40,6 +40,7 @@ import {
     Play,
     Hash,
     Link2,
+    Pencil,
 } from "lucide-react";
 
 export default function DashboardPage() {
@@ -398,13 +399,22 @@ export default function DashboardPage() {
                                                         <span className="text-gray-600 text-[11px]">· {m.maxParticipants} max</span>
                                                     </div>
                                                 </div>
-                                                <button
-                                                    onClick={() => { if (address) { deleteScheduledMeeting(address, m.id); reloadScheduled(); } }}
-                                                    className="p-1.5 rounded-lg text-gray-600 hover:text-red-400 hover:bg-red-500/10 transition-all opacity-0 group-hover:opacity-100"
-                                                    title="Remove"
-                                                >
-                                                    <Trash2 size={14} />
-                                                </button>
+                                                <div className="flex items-center gap-1">
+                                                    <button
+                                                        onClick={() => router.push(`/app/schedule?edit=${m.id}`)}
+                                                        className="p-1.5 rounded-lg text-gray-600 hover:text-blue-400 hover:bg-blue-500/10 transition-all opacity-0 group-hover:opacity-100"
+                                                        title="Edit meeting"
+                                                    >
+                                                        <Pencil size={14} />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => { if (address) { deleteScheduledMeeting(address, m.id); reloadScheduled(); } }}
+                                                        className="p-1.5 rounded-lg text-gray-600 hover:text-red-400 hover:bg-red-500/10 transition-all opacity-0 group-hover:opacity-100"
+                                                        title="Remove"
+                                                    >
+                                                        <Trash2 size={14} />
+                                                    </button>
+                                                </div>
                                             </div>
                                             <div className="flex items-center gap-3 text-[12px] text-gray-400">
                                                 <div className="flex items-center gap-1.5">
