@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { useAccount, useDisconnect, useReadContract } from "@starknet-react/core";
 import { loadTxHistory, saveTx, TxRecord } from "@/lib/txHistory";
+import { upcomingMeetings, ScheduledMeeting, deleteScheduledMeeting } from "@/lib/scheduledMeetings";
 import { useStrkBalance } from "@/lib/useStrkBalance";
 import { ROOM_VAULT_ADDRESS, ROOM_VAULT_ABI, STRK_ADDRESS, STRK_APPROVE_ABI, toU256Calldata, formatStrkAmount } from "@/lib/roomVault";
 import { useRouter } from "next/navigation";
@@ -33,6 +34,10 @@ import {
     Loader2,
     ExternalLink,
     RefreshCw,
+    Trash2,
+    Globe,
+    Lock,
+    Play,
 } from "lucide-react";
 
 export default function DashboardPage() {
@@ -50,13 +55,19 @@ export default function DashboardPage() {
     const [meetingId] = useState(Math.random().toString(36).substring(2, 11).toUpperCase());
     const [meetingIdCopied, setMeetingIdCopied] = useState(false);
     const [txHistory, setTxHistory] = useState<TxRecord[]>([]);
+    const [scheduledList, setScheduledList] = useState<ScheduledMeeting[]>([]);
 
     const reloadTxHistory = () => {
         if (address) setTxHistory(loadTxHistory(address));
     };
 
+    const reloadScheduled = () => {
+        if (address) setScheduledList(upcomingMeetings(address));
+    };
+
     useEffect(() => {
         reloadTxHistory();
+        reloadScheduled();
     }, [address, isWalletOpen, isNotificationsOpen]);
 
     const handleCopyMeetingId = (e: React.MouseEvent) => {
@@ -123,7 +134,7 @@ export default function DashboardPage() {
                 <nav className="flex-1 flex flex-col gap-2 px-3">
                     <SidebarItem icon={<Home size={22} />} label="Home" active={!isWalletOpen} onClick={() => setIsWalletOpen(false)} />
                     <SidebarItem icon={<Wallet size={22} />} label="Wallet" active={isWalletOpen} onClick={() => setIsWalletOpen(true)} />
-
+                    <SidebarItem icon={<Calendar size={22} />} label="Schedule" onClick={() => router.push("/app/schedule")} />
                     <SidebarItem icon={<Zap size={22} />} label="Hackathon" />
                     <SidebarItem icon={<User size={22} />} label="Class" />
                     <SidebarItem icon={<Settings size={22} />} label="Settings" />
@@ -150,7 +161,10 @@ export default function DashboardPage() {
                     <Wallet size={20} />
                     <span className="text-[10px] font-bold">Wallet</span>
                 </button>
-
+                <button onClick={() => router.push("/app/schedule")} className="p-2 flex flex-col items-center gap-1 text-gray-400">
+                    <Calendar size={20} />
+                    <span className="text-[10px] font-bold">Schedule</span>
+                </button>
                 <button onClick={() => disconnect()} className="p-2 flex flex-col items-center gap-1 text-red-400">
                     <LogOut size={20} />
                     <span className="text-[10px] font-bold">Exit</span>
@@ -315,6 +329,7 @@ export default function DashboardPage() {
                             color="bg-white/5 border-2 border-[#FFFFFF]"
                             description="Plan upcoming meetings"
                             labelColor="text-white"
+                            onClick={() => router.push("/app/schedule")}
                         />
                     </div>
 
@@ -337,6 +352,77 @@ export default function DashboardPage() {
                         </div>
                     </div>
                 </div>
+
+                {/* ── Upcoming Scheduled Meetings ── */}
+                {scheduledList.length > 0 && (
+                    <div className="px-4 md:px-8 lg:px-12 pb-8 max-w-[1400px] mx-auto w-full">
+                        <div className="flex items-center justify-between mb-5">
+                            <h2 className="text-[18px] font-black tracking-tight">Upcoming Meetings</h2>
+                            <button
+                                onClick={() => router.push("/app/schedule")}
+                                className="text-[13px] font-bold text-blue-400 hover:text-blue-300 transition-colors"
+                            >
+                                + Schedule new
+                            </button>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {scheduledList.slice(0, 3).map(m => {
+                                const dt = new Date(`${m.date}T${m.startTime}:00`);
+                                const dateStr = dt.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+                                const timeStr = dt.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+                                const durationStr = m.duration < 60 ? `${m.duration}m` : `${Math.floor(m.duration / 60)}h${m.duration % 60 ? ` ${m.duration % 60}m` : ""}`;
+                                return (
+                                    <div key={m.id} className="bg-[#111112] border border-white/8 rounded-3xl p-5 flex flex-col gap-4 hover:border-white/15 transition-all group">
+                                        <div className="flex items-start justify-between gap-2">
+                                            <div className="flex-1 min-w-0">
+                                                <p className="font-black text-[15px] truncate">{m.topic}</p>
+                                                <div className="flex items-center gap-1.5 mt-1">
+                                                    {m.isPublic
+                                                        ? <Globe size={11} className="text-blue-400" />
+                                                        : <Lock size={11} className="text-yellow-400" />}
+                                                    <span className={`text-[11px] font-bold ${m.isPublic ? "text-blue-400" : "text-yellow-400"}`}>
+                                                        {m.isPublic ? "Public" : "Private"}
+                                                    </span>
+                                                    <span className="text-gray-600 text-[11px]">· {m.maxParticipants} max</span>
+                                                </div>
+                                            </div>
+                                            <button
+                                                onClick={() => { if (address) { deleteScheduledMeeting(address, m.id); reloadScheduled(); } }}
+                                                className="p-1.5 rounded-lg text-gray-600 hover:text-red-400 hover:bg-red-500/10 transition-all opacity-0 group-hover:opacity-100"
+                                                title="Remove"
+                                            >
+                                                <Trash2 size={14} />
+                                            </button>
+                                        </div>
+                                        <div className="flex items-center gap-3 text-[12px] text-gray-400">
+                                            <div className="flex items-center gap-1.5">
+                                                <Calendar size={12} className="text-blue-400" />
+                                                <span>{dateStr}</span>
+                                            </div>
+                                            <div className="flex items-center gap-1.5">
+                                                <Clock size={12} className="text-green-400" />
+                                                <span>{timeStr} · {durationStr}</span>
+                                            </div>
+                                        </div>
+                                        {m.description && (
+                                            <p className="text-[12px] text-gray-500 line-clamp-2 leading-relaxed">{m.description}</p>
+                                        )}
+                                        <button
+                                            onClick={() => router.push(`/app/room/${m.id}?mode=create`)}
+                                            className="w-full flex items-center justify-center gap-2 py-3 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 font-black rounded-2xl transition-all active:scale-95 text-[13px] border border-blue-500/20 hover:border-blue-500/30"
+                                        >
+                                            <Play size={14} />
+                                            Start Meeting
+                                        </button>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                        {scheduledList.length > 3 && (
+                            <p className="text-center text-[13px] text-gray-600 mt-4">+{scheduledList.length - 3} more scheduled meetings</p>
+                        )}
+                    </div>
+                )}
 
                 {/* Drawer Overlays */}
                 <WalletDrawer isOpen={isWalletOpen} onClose={() => setIsWalletOpen(false)} txHistory={txHistory} reloadTxHistory={reloadTxHistory} />
