@@ -7,7 +7,7 @@ import Image from "next/image";
 import {
     ArrowLeft, Calendar, Clock, Globe, Lock, Users, Video,
     Radio, ChevronDown, Check, Loader2, CheckCircle2, Shield,
-    FileText, Hash
+    FileText, Hash, Copy, ExternalLink, Link2
 } from "lucide-react";
 import { saveScheduledMeeting, ScheduledMeeting } from "@/lib/scheduledMeetings";
 
@@ -95,6 +95,9 @@ export default function SchedulePage() {
     const [tzOpen, setTzOpen] = useState(false);
 
     const [status, setStatus] = useState<"idle" | "saving" | "done">("idle");
+    const [savedMeeting, setSavedMeeting] = useState<ScheduledMeeting | null>(null);
+    const [copiedId, setCopiedId] = useState(false);
+    const [copiedLink, setCopiedLink] = useState(false);
 
     useEffect(() => {
         setHasMounted(true);
@@ -147,9 +150,24 @@ export default function SchedulePage() {
         };
         saveScheduledMeeting(address, meeting);
         setTimeout(() => {
+            setSavedMeeting(meeting);
             setStatus("done");
-            setTimeout(() => router.push("/app/dashboard"), 1200);
         }, 600);
+    };
+
+    const handleCopyId = () => {
+        if (!savedMeeting) return;
+        navigator.clipboard.writeText(savedMeeting.id);
+        setCopiedId(true);
+        setTimeout(() => setCopiedId(false), 2000);
+    };
+
+    const handleCopyLink = () => {
+        if (!savedMeeting) return;
+        const link = `${window.location.origin}/app/room/${savedMeeting.id}?mode=join`;
+        navigator.clipboard.writeText(link);
+        setCopiedLink(true);
+        setTimeout(() => setCopiedLink(false), 2000);
     };
 
     return (
@@ -244,8 +262,8 @@ export default function SchedulePage() {
                                     type="button"
                                     onClick={() => setDuration(d.value)}
                                     className={`px-5 py-2.5 rounded-2xl font-bold text-[14px] transition-all active:scale-95 border ${duration === d.value
-                                            ? "bg-blue-500 text-white border-blue-500 shadow-lg shadow-blue-500/20"
-                                            : "bg-white/5 text-gray-400 border-white/10 hover:border-white/20 hover:text-white"
+                                        ? "bg-blue-500 text-white border-blue-500 shadow-lg shadow-blue-500/20"
+                                        : "bg-white/5 text-gray-400 border-white/10 hover:border-white/20 hover:text-white"
                                         }`}
                                 >
                                     {d.label}
@@ -383,92 +401,159 @@ export default function SchedulePage() {
                 {/* ── Right: Summary Card + CTA ── */}
                 <div className="lg:w-[360px] flex flex-col gap-6 lg:sticky lg:top-[80px] lg:self-start">
 
-                    {/* Live Summary */}
-                    <div className="bg-[#111112] border border-white/10 rounded-3xl p-6 flex flex-col gap-5 shadow-2xl">
-                        <div className="flex items-center gap-3 pb-4 border-b border-white/5">
-                            <div className="w-10 h-10 bg-blue-500/10 rounded-2xl flex items-center justify-center">
-                                <Video size={20} className="text-blue-400" />
+                    {status === "done" && savedMeeting ? (
+                        /* ── Success / Invite Card ── */
+                        <div className="flex flex-col gap-5 animate-in fade-in zoom-in-95 duration-300">
+                            {/* Big checkmark */}
+                            <div className="bg-green-500/10 border border-green-500/20 rounded-3xl p-6 flex flex-col items-center gap-3 text-center">
+                                <div className="w-14 h-14 bg-green-500/20 rounded-full flex items-center justify-center">
+                                    <CheckCircle2 size={28} className="text-green-400" />
+                                </div>
+                                <div>
+                                    <p className="font-black text-[18px] text-white">{savedMeeting.topic}</p>
+                                    <p className="text-[13px] text-green-400 font-bold mt-1">Meeting Scheduled!</p>
+                                </div>
                             </div>
-                            <div className="flex-1 min-w-0">
-                                <p className="font-black text-[16px] truncate">{topic || "Meeting Topic"}</p>
-                                <p className="text-[12px] text-gray-500">Scheduled by you</p>
-                            </div>
-                        </div>
 
-                        <div className="flex flex-col gap-4">
-                            <SummaryRow icon={<Calendar size={15} className="text-blue-400" />} label="When">
-                                <span className="text-[13px] text-right">{formatDateTime(date, startTime, timezone)}</span>
-                            </SummaryRow>
-                            <SummaryRow icon={<Clock size={15} className="text-green-400" />} label="Duration">
-                                {formatDuration(duration)}
-                            </SummaryRow>
-                            <SummaryRow icon={<Globe size={15} className="text-purple-400" />} label="Timezone">
-                                {timezone}
-                            </SummaryRow>
-                            <SummaryRow
-                                icon={isPublic
-                                    ? <Globe size={15} className="text-blue-400" />
-                                    : <Lock size={15} className="text-yellow-400" />}
-                                label="Visibility"
+                            {/* Meeting ID */}
+                            <div className="bg-[#111112] border border-white/10 rounded-3xl p-5 flex flex-col gap-3">
+                                <p className="text-[11px] font-bold text-gray-500 uppercase tracking-widest">Meeting ID</p>
+                                <div className="flex items-center gap-3 bg-white/5 rounded-2xl px-4 py-3 border border-white/5">
+                                    <span className="flex-1 font-mono font-black text-[18px] text-blue-300 tracking-widest">
+                                        {savedMeeting.id}
+                                    </span>
+                                    <button
+                                        onClick={handleCopyId}
+                                        className={`p-2 rounded-xl transition-all active:scale-90 ${copiedId
+                                                ? "bg-green-500/20 text-green-400"
+                                                : "hover:bg-white/10 text-gray-400 hover:text-white"
+                                            }`}
+                                        title="Copy meeting ID"
+                                    >
+                                        {copiedId ? <Check size={16} /> : <Copy size={16} />}
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Share Link */}
+                            <div className="bg-[#111112] border border-white/10 rounded-3xl p-5 flex flex-col gap-3">
+                                <p className="text-[11px] font-bold text-gray-500 uppercase tracking-widest">Share Invite Link</p>
+                                <div className="flex items-center gap-3 bg-white/5 rounded-2xl px-4 py-3 border border-white/5 group">
+                                    <Link2 size={14} className="text-gray-500 shrink-0" />
+                                    <span className="flex-1 text-[12px] text-gray-300 font-medium truncate">
+                                        {typeof window !== "undefined" ? window.location.host : ""}/app/room/{savedMeeting.id}?mode=join
+                                    </span>
+                                    <button
+                                        onClick={handleCopyLink}
+                                        className={`p-2 rounded-xl transition-all active:scale-90 shrink-0 ${copiedLink
+                                                ? "bg-green-500/20 text-green-400"
+                                                : "hover:bg-white/10 text-gray-400 hover:text-white"
+                                            }`}
+                                        title="Copy link"
+                                    >
+                                        {copiedLink ? <Check size={16} /> : <Copy size={16} />}
+                                    </button>
+                                </div>
+                                <p className="text-[11px] text-gray-600 px-1">
+                                    Share this link so others can join when the meeting starts.
+                                </p>
+                            </div>
+
+                            {/* Actions */}
+                            <button
+                                onClick={() => router.push("/app/dashboard")}
+                                className="w-full py-4 bg-white/10 hover:bg-white/20 text-white font-black rounded-2xl transition-all active:scale-95 text-[15px]"
                             >
-                                <span className={isPublic ? "text-blue-400" : "text-yellow-400"}>
-                                    {isPublic ? "Public" : "Private"}
-                                </span>
-                            </SummaryRow>
-                            <SummaryRow icon={<Users size={15} className="text-orange-400" />} label="Max Guests">
-                                {maxParticipants} people
-                            </SummaryRow>
-                            {enableRecording && (
-                                <SummaryRow icon={<Radio size={15} className="text-red-400" />} label="Recording">
-                                    <span className="text-red-400">Enabled</span>
-                                </SummaryRow>
-                            )}
-                            {!isPublic && passcode && (
-                                <SummaryRow icon={<Shield size={15} className="text-yellow-400" />} label="Passcode">
-                                    <span className="font-mono text-yellow-300">{passcode}</span>
-                                </SummaryRow>
-                            )}
+                                Go to Dashboard
+                            </button>
                         </div>
+                    ) : (
+                        <>
+                            {/* Live Summary */}
+                            <div className="bg-[#111112] border border-white/10 rounded-3xl p-6 flex flex-col gap-5 shadow-2xl">
+                                <div className="flex items-center gap-3 pb-4 border-b border-white/5">
+                                    <div className="w-10 h-10 bg-blue-500/10 rounded-2xl flex items-center justify-center">
+                                        <Video size={20} className="text-blue-400" />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="font-black text-[16px] truncate">{topic || "Meeting Topic"}</p>
+                                        <p className="text-[12px] text-gray-500">Scheduled by you</p>
+                                    </div>
+                                </div>
 
-                        {description.trim() && (
-                            <div className="pt-4 border-t border-white/5">
-                                <p className="text-[11px] font-bold text-gray-500 uppercase tracking-widest mb-2">Agenda</p>
-                                <p className="text-[13px] text-gray-300 leading-relaxed">{description}</p>
+                                <div className="flex flex-col gap-4">
+                                    <SummaryRow icon={<Calendar size={15} className="text-blue-400" />} label="When">
+                                        <span className="text-[13px] text-right">{formatDateTime(date, startTime, timezone)}</span>
+                                    </SummaryRow>
+                                    <SummaryRow icon={<Clock size={15} className="text-green-400" />} label="Duration">
+                                        {formatDuration(duration)}
+                                    </SummaryRow>
+                                    <SummaryRow icon={<Globe size={15} className="text-purple-400" />} label="Timezone">
+                                        {timezone}
+                                    </SummaryRow>
+                                    <SummaryRow
+                                        icon={isPublic
+                                            ? <Globe size={15} className="text-blue-400" />
+                                            : <Lock size={15} className="text-yellow-400" />}
+                                        label="Visibility"
+                                    >
+                                        <span className={isPublic ? "text-blue-400" : "text-yellow-400"}>
+                                            {isPublic ? "Public" : "Private"}
+                                        </span>
+                                    </SummaryRow>
+                                    <SummaryRow icon={<Users size={15} className="text-orange-400" />} label="Max Guests">
+                                        {maxParticipants} people
+                                    </SummaryRow>
+                                    {enableRecording && (
+                                        <SummaryRow icon={<Radio size={15} className="text-red-400" />} label="Recording">
+                                            <span className="text-red-400">Enabled</span>
+                                        </SummaryRow>
+                                    )}
+                                    {!isPublic && passcode && (
+                                        <SummaryRow icon={<Shield size={15} className="text-yellow-400" />} label="Passcode">
+                                            <span className="font-mono text-yellow-300">{passcode}</span>
+                                        </SummaryRow>
+                                    )}
+                                </div>
+
+                                {description.trim() && (
+                                    <div className="pt-4 border-t border-white/5">
+                                        <p className="text-[11px] font-bold text-gray-500 uppercase tracking-widest mb-2">Agenda</p>
+                                        <p className="text-[13px] text-gray-300 leading-relaxed">{description}</p>
+                                    </div>
+                                )}
                             </div>
-                        )}
-                    </div>
 
-                    {/* Validation hint */}
-                    {!canSave && (
-                        <div className="bg-red-500/10 border border-red-500/20 rounded-2xl px-4 py-3 text-[13px] text-red-400 font-medium">
-                            {!topic.trim()
-                                ? "Please enter a meeting topic."
-                                : !isPublic && passcode.trim().length < 4
-                                    ? "Passcode must be at least 4 characters."
-                                    : "Please fill in all required fields."}
-                        </div>
+                            {/* Validation hint */}
+                            {!canSave && (
+                                <div className="bg-red-500/10 border border-red-500/20 rounded-2xl px-4 py-3 text-[13px] text-red-400 font-medium">
+                                    {!topic.trim()
+                                        ? "Please enter a meeting topic."
+                                        : !isPublic && passcode.trim().length < 4
+                                            ? "Passcode must be at least 4 characters."
+                                            : "Please fill in all required fields."}
+                                </div>
+                            )}
+
+                            {/* CTA */}
+                            <button
+                                onClick={handleSave}
+                                disabled={!canSave || status !== "idle"}
+                                className={`w-full py-5 rounded-2xl font-black text-[16px] transition-all active:scale-95 flex items-center justify-center gap-3 shadow-xl ${canSave
+                                        ? "bg-blue-500 hover:bg-blue-400 text-white shadow-blue-500/20"
+                                        : "bg-white/5 text-white/30 cursor-not-allowed"
+                                    }`}
+                            >
+                                {status === "saving" && <Loader2 size={20} className="animate-spin" />}
+                                {status === "idle" && <Calendar size={20} />}
+                                {status === "saving" ? "Scheduling…" : "Schedule Meeting"}
+                            </button>
+
+                            <p className="text-center text-[12px] text-gray-600">
+                                You can start the meeting directly from your dashboard.
+                            </p>
+                        </>
                     )}
-
-                    {/* CTA */}
-                    <button
-                        onClick={handleSave}
-                        disabled={!canSave || status !== "idle"}
-                        className={`w-full py-5 rounded-2xl font-black text-[16px] transition-all active:scale-95 flex items-center justify-center gap-3 shadow-xl ${status === "done"
-                                ? "bg-green-500 text-white shadow-green-500/20"
-                                : canSave
-                                    ? "bg-blue-500 hover:bg-blue-400 text-white shadow-blue-500/20"
-                                    : "bg-white/5 text-white/30 cursor-not-allowed"
-                            }`}
-                    >
-                        {status === "saving" && <Loader2 size={20} className="animate-spin" />}
-                        {status === "done" && <CheckCircle2 size={20} />}
-                        {status === "idle" && <Calendar size={20} />}
-                        {status === "saving" ? "Scheduling…" : status === "done" ? "Scheduled!" : "Schedule Meeting"}
-                    </button>
-
-                    <p className="text-center text-[12px] text-gray-600">
-                        You can start the meeting directly from your dashboard.
-                    </p>
                 </div>
             </div>
         </main>

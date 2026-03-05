@@ -38,6 +38,8 @@ import {
     Globe,
     Lock,
     Play,
+    Hash,
+    Link2,
 } from "lucide-react";
 
 export default function DashboardPage() {
@@ -404,6 +406,8 @@ export default function DashboardPage() {
                                                 <span>{timeStr} · {durationStr}</span>
                                             </div>
                                         </div>
+                                        {/* Meeting ID + Copy Link */}
+                                        <MeetingInviteRow meetingId={m.id} />
                                         {m.description && (
                                             <p className="text-[12px] text-gray-500 line-clamp-2 leading-relaxed">{m.description}</p>
                                         )}
@@ -429,6 +433,61 @@ export default function DashboardPage() {
                 <NotificationDrawer isOpen={isNotificationsOpen} onClose={() => setIsNotificationsOpen(false)} txHistory={txHistory} />
             </div>
         </main>
+    );
+}
+
+function MeetingInviteRow({ meetingId }: { meetingId: string }) {
+    const [copiedId, setCopiedId] = React.useState(false);
+    const [copiedLink, setCopiedLink] = React.useState(false);
+
+    const handleCopyId = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        navigator.clipboard.writeText(meetingId);
+        setCopiedId(true);
+        setTimeout(() => setCopiedId(false), 2000);
+    };
+
+    const handleCopyLink = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        const link = `${window.location.origin}/app/room/${meetingId}?mode=join`;
+        navigator.clipboard.writeText(link);
+        setCopiedLink(true);
+        setTimeout(() => setCopiedLink(false), 2000);
+    };
+
+    return (
+        <div className="flex flex-col gap-2 bg-white/[0.03] border border-white/5 rounded-2xl px-3 py-2.5">
+            {/* ID row */}
+            <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                    <Hash size={11} className="text-gray-500 shrink-0" />
+                    <span className="font-mono font-black text-[13px] text-blue-300 tracking-widest truncate">{meetingId}</span>
+                </div>
+                <button
+                    onClick={handleCopyId}
+                    title="Copy meeting ID"
+                    className={`p-1.5 rounded-lg shrink-0 transition-all active:scale-90 text-[10px] font-bold flex items-center gap-1 ${copiedId ? "text-green-400" : "text-gray-500 hover:text-white"}`}
+                >
+                    {copiedId ? <Check size={12} /> : <Copy size={12} />}
+                    {copiedId ? "Copied!" : "ID"}
+                </button>
+            </div>
+            {/* Link row */}
+            <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                    <Link2 size={11} className="text-gray-500 shrink-0" />
+                    <span className="text-[11px] text-gray-500 truncate">Invite link</span>
+                </div>
+                <button
+                    onClick={handleCopyLink}
+                    title="Copy invite link"
+                    className={`p-1.5 rounded-lg shrink-0 transition-all active:scale-90 text-[10px] font-bold flex items-center gap-1 ${copiedLink ? "text-green-400" : "text-gray-500 hover:text-white"}`}
+                >
+                    {copiedLink ? <Check size={12} /> : <Copy size={12} />}
+                    {copiedLink ? "Copied!" : "Copy"}
+                </button>
+            </div>
+        </div>
     );
 }
 
