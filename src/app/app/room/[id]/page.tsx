@@ -33,7 +33,10 @@ import {
     useRoomContext,
     useTrackRefContext,
     useIsMuted,
-    useParticipantContext
+    useParticipantContext,
+    VideoTrack,
+    AudioTrack,
+    ParticipantName
 } from "@livekit/components-react";
 import { Track, ConnectionState, Participant, LocalParticipant } from "livekit-client";
 import PreJoinScreen from "@/components/PreJoinScreen";
@@ -633,6 +636,11 @@ function RoomInterface({
                                 <div className="md:w-[220px] md:h-full h-[120px] w-full shrink-0">
                                     <CarouselLayout tracks={tracks as TrackReferenceOrPlaceholder[]}>
                                         <ParticipantTile>
+                                            <VideoTrack className="absolute inset-0 w-full h-full object-cover" />
+                                            <AudioTrack />
+                                            <div className="absolute bottom-2 left-2 z-10 px-2 py-1 bg-black/60 backdrop-blur-md rounded text-xs font-bold text-white max-w-[calc(100%-16px)] truncate">
+                                                <ParticipantName />
+                                            </div>
                                             <CustomAvatarOverlay />
                                         </ParticipantTile>
                                     </CarouselLayout>
@@ -644,6 +652,11 @@ function RoomInterface({
                                 style={{ height: "100%", width: "100%" }}
                             >
                                 <ParticipantTile>
+                                    <VideoTrack className="absolute inset-0 w-full h-full object-cover" />
+                                    <AudioTrack />
+                                    <div className="absolute bottom-4 left-4 z-10 px-3 py-1.5 bg-black/60 backdrop-blur-md rounded-lg text-sm font-bold text-white max-w-[calc(100%-32px)] truncate shadow-lg">
+                                        <ParticipantName />
+                                    </div>
                                     <CustomAvatarOverlay />
                                 </ParticipantTile>
                             </GridLayout>
