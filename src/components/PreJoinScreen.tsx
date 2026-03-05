@@ -21,12 +21,9 @@ export default function PreJoinScreen({
     const [error, setError] = useState<string>("");
 
     useEffect(() => {
-        // Load name from local storage if neither provided nor set
-        if (!name) {
-            const savedName = localStorage.getItem("room_display_name");
-            if (savedName) setName(savedName);
-        }
-    }, [name]);
+        // We intentionally don't load from local storage
+        // to force the user to enter their name each time.
+    }, []);
 
     useEffect(() => {
         let active = true;

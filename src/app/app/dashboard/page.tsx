@@ -41,23 +41,7 @@ import {
     Link2,
     Pencil,
 } from "lucide-react";
-
-const PROFILE_PICS = [
-    "/assets/avatars/profile1.jpg",
-    "/assets/avatars/profile2.jpg",
-    "/assets/avatars/profile3.jpg",
-    "/assets/avatars/profile4.jpg",
-    "/assets/avatars/profile6.jpg"
-];
-
-function getProfilePic(address?: string) {
-    if (!address) return PROFILE_PICS[0];
-    let hash = 0;
-    for (let i = 0; i < address.length; i++) {
-        hash = address.charCodeAt(i) + ((hash << 5) - hash);
-    }
-    return PROFILE_PICS[Math.abs(hash) % PROFILE_PICS.length];
-}
+import { getProfilePic } from "@/lib/profile";
 
 export default function DashboardPage() {
     const { address, isConnected, isConnecting, isReconnecting } = useAccount();
@@ -156,6 +140,7 @@ export default function DashboardPage() {
                     <SidebarItem icon={<Home size={22} />} label="Home" active={!isWalletOpen} onClick={() => setIsWalletOpen(false)} />
                     <SidebarItem icon={<Wallet size={22} />} label="Wallet" active={isWalletOpen} onClick={() => setIsWalletOpen(true)} />
                     <SidebarItem icon={<Calendar size={22} />} label="Schedule" onClick={() => router.push("/app/schedule")} />
+                    <SidebarItem icon={<User size={22} />} label="Profile" onClick={() => router.push("/app/profile")} />
                     <SidebarItem icon={<Settings size={22} />} label="Settings" />
                 </nav>
 
