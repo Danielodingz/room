@@ -31,6 +31,8 @@ import {
     useChat,
     useDataChannel,
     useRoomContext,
+    useTrackRefContext,
+    useIsMuted,
     useParticipantContext
 } from "@livekit/components-react";
 import { Track, ConnectionState, Participant, LocalParticipant } from "livekit-client";
@@ -211,8 +213,13 @@ function parseStarknetError(err: any): string {
 
 // ─── Custom Avatar Overlay for Video Tiles ───────────────────────────────────────
 function CustomAvatarOverlay() {
-    const { identity, isCameraEnabled, name } = useParticipantContext();
-    if (isCameraEnabled) return null;
+    const { identity, name } = useParticipantContext();
+    const trackRef = useTrackRefContext();
+    const isMuted = useIsMuted(trackRef);
+
+    // Only show the custom avatar if the camera is muted or not published
+    if (!isMuted && trackRef.source === Track.Source.Camera) return null;
+
     return (
         <>
             <div className="absolute inset-0 bg-[#1C1C1E] pointer-events-none" style={{ zIndex: 1 }} />
