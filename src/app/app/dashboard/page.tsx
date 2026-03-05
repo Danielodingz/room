@@ -23,7 +23,6 @@ import {
     ChevronDown,
     ChevronLeft,
     Wallet,
-    Zap,
     Bell,
     Copy,
     Check,
@@ -157,8 +156,6 @@ export default function DashboardPage() {
                     <SidebarItem icon={<Home size={22} />} label="Home" active={!isWalletOpen} onClick={() => setIsWalletOpen(false)} />
                     <SidebarItem icon={<Wallet size={22} />} label="Wallet" active={isWalletOpen} onClick={() => setIsWalletOpen(true)} />
                     <SidebarItem icon={<Calendar size={22} />} label="Schedule" onClick={() => router.push("/app/schedule")} />
-                    <SidebarItem icon={<Zap size={22} />} label="Hackathon" />
-                    <SidebarItem icon={<User size={22} />} label="Class" />
                     <SidebarItem icon={<Settings size={22} />} label="Settings" />
                 </nav>
 
