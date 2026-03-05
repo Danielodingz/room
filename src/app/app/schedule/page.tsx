@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAccount } from "@starknet-react/core";
 import Image from "next/image";
@@ -75,7 +75,7 @@ function nextHalfHour() {
     return `${hh}:${mm}`;
 }
 
-export default function SchedulePage() {
+function SchedulePageInner() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const editId = searchParams.get("edit");
@@ -680,6 +680,18 @@ export default function SchedulePage() {
                 </div>
             </div>
         </main>
+    );
+}
+
+export default function SchedulePage() {
+    return (
+        <Suspense fallback={
+            <main className="min-h-screen bg-[#0A0A0B] flex items-center justify-center">
+                <div className="animate-spin rounded-full h-9 w-9 border-2 border-white/10 border-t-white/40" />
+            </main>
+        }>
+            <SchedulePageInner />
+        </Suspense>
     );
 }
 
