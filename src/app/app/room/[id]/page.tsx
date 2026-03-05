@@ -9,10 +9,11 @@ import {
     ScreenShare, MoreHorizontal, PhoneOff, Maximize2,
     ChevronUp, X, MessageCircle, Paperclip, SmilePlus, Send,
     ShieldCheck, Gift, Loader2, Hand, CheckCircle2, AlertCircle,
-    ExternalLink, AtSign, DollarSign
+    ExternalLink, AtSign, DollarSign, FileText
 } from "lucide-react";
 import { useAccount } from "@starknet-react/core";
 import { ROOM_VAULT_ADDRESS, toU256Calldata, ROOM_VAULT_ABI, formatStrkAmount } from "@/lib/roomVault";
+import { getProfilePic } from "@/lib/profile";
 import { useReadContract } from "@starknet-react/core";
 import {
     LiveKitRoom,
@@ -29,7 +30,8 @@ import {
     useParticipants,
     useChat,
     useDataChannel,
-    useRoomContext
+    useRoomContext,
+    useParticipantContext
 } from "@livekit/components-react";
 import { Track, ConnectionState, Participant, LocalParticipant } from "livekit-client";
 import PreJoinScreen from "@/components/PreJoinScreen";
@@ -207,6 +209,20 @@ function parseStarknetError(err: any): string {
     return msg.length > 180 ? msg.slice(0, 180) + "…" : msg;
 }
 
+// ─── Custom Avatar Overlay for Video Tiles ───────────────────────────────────────
+function CustomAvatarOverlay() {
+    const { identity, isCameraEnabled, name } = useParticipantContext();
+    if (isCameraEnabled) return null;
+    return (
+        <>
+            <div className="absolute inset-0 bg-[#1C1C1E] pointer-events-none" style={{ zIndex: 1 }} />
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ zIndex: 2 }}>
+                <img src={getProfilePic(identity)} alt={name || "User"} className="w-24 h-24 rounded-full border-2 border-white/10 object-cover shadow-2xl" />
+            </div>
+        </>
+    );
+}
+
 // ─── Room Interface ────────────────────────────────────────────────────────────
 function RoomInterface({
     meetingId,
@@ -261,12 +277,79 @@ function RoomInterface({
     // ── Payment received notification ──
     const [paymentNotif, setPaymentNotif] = useState<{ from: string, amount: string } | null>(null);
 
+    // ── Poll State ──
+    const [isPollOpen, setIsPollOpen] = useState(false);
+    const [activePoll, setActivePoll] = useState<{ question: string, options: { id: string, text: string, votes: number }[], voted: boolean } | null>(null);
+    const [pollQuestion, setPollQuestion] = useState("");
+    const [pollOptions, setPollOptions] = useState(["", ""]);
+
     // ── LiveKit Hooks ──
     const { localParticipant, isMicrophoneEnabled, isCameraEnabled, isScreenShareEnabled } = useLocalParticipant();
     const { send: sendChatMessage, chatMessages, isSending } = useChat();
-    const { send: sendReactionData, message: incomingReaction } = useDataChannel("reactions");
-    const { send: sendHandUpdate, message: handMessage } = useDataChannel("hands");
-    const { send: sendPaymentNotif, message: incomingPayment } = useDataChannel("payments");
+    const { send: sendReactionData } = useDataChannel("reactions", (msg) => {
+        try {
+            const data = JSON.parse(new TextDecoder().decode(msg.payload));
+            setActiveReaction(data);
+            setTimeout(() => setActiveReaction(null), 3000);
+        } catch (e) { console.error(e); }
+    });
+
+    const { send: sendHandUpdate } = useDataChannel("hands", (msg) => {
+        try {
+            const data = JSON.parse(new TextDecoder().decode(msg.payload));
+            if (data.isRaised) {
+                setRaisedHands(prev => !prev.includes(data.from) ? [...prev, data.from] : prev);
+            } else {
+                setRaisedHands(prev => prev.filter(id => id !== data.from));
+            }
+        } catch (e) { console.error(e); }
+    });
+
+    const { send: sendPaymentNotif } = useDataChannel("payments", (msg) => {
+        try {
+            const data = JSON.parse(new TextDecoder().decode(msg.payload));
+            if (data.to === address) {
+                setPaymentNotif({ from: data.from, amount: data.amount });
+                setTimeout(() => setPaymentNotif(null), 6000);
+                refetchVault();
+                if (address) {
+                    saveTx(address, {
+                        txHash: "",
+                        from: data.from,
+                        fromAddress: data.fromAddress || "",
+                        to: userIdentifier,
+                        toAddress: address,
+                        amount: data.amount,
+                        symbol: TOKEN_SYMBOL,
+                        timestamp: Date.now(),
+                        direction: "received"
+                    });
+                }
+            }
+        } catch (e) { console.error(e); }
+    });
+
+    const { send: sendPollData } = useDataChannel("polls", (msg) => {
+        try {
+            const data = JSON.parse(new TextDecoder().decode(msg.payload));
+            if (data.type === "START_POLL") {
+                setActivePoll({ question: data.question, options: data.options.map((o: any) => ({ ...o, votes: 0 })), voted: false });
+                setIsPollOpen(true);
+            } else if (data.type === "VOTE" && activePoll) {
+                setActivePoll(prev => {
+                    if (!prev) return prev;
+                    return {
+                        ...prev,
+                        options: prev.options.map(o => o.id === data.optionId ? { ...o, votes: o.votes + 1 } : o)
+                    };
+                });
+            } else if (data.type === "END_POLL") {
+                setActivePoll(null);
+                setIsPollOpen(false);
+            }
+        } catch (e) { console.error(e); }
+    });
+
     const participants = useParticipants();
 
     const role = localParticipant?.metadata ? JSON.parse(localParticipant.metadata).role : "participant";
@@ -287,16 +370,6 @@ function RoomInterface({
     const hasScreenShare = screenShareTracks.length > 0;
 
     // ── Reactions ──
-    useEffect(() => {
-        if (incomingReaction) {
-            try {
-                const data = JSON.parse(new TextDecoder().decode(incomingReaction.payload));
-                setActiveReaction(data);
-                setTimeout(() => setActiveReaction(null), 3000);
-            } catch (e) { console.error(e); }
-        }
-    }, [incomingReaction]);
-
     const handleSendReaction = (emoji: string) => {
         const payload = JSON.stringify({ emoji, from: userIdentifier });
         sendReactionData(new TextEncoder().encode(payload), { reliable: true });
@@ -306,19 +379,6 @@ function RoomInterface({
     };
 
     // ── Hand Raise ──
-    useEffect(() => {
-        if (handMessage) {
-            try {
-                const data = JSON.parse(new TextDecoder().decode(handMessage.payload));
-                if (data.isRaised) {
-                    setRaisedHands(prev => !prev.includes(data.from) ? [...prev, data.from] : prev);
-                } else {
-                    setRaisedHands(prev => prev.filter(id => id !== data.from));
-                }
-            } catch (e) { console.error(e); }
-        }
-    }, [handMessage]);
-
     const toggleHand = () => {
         const newState = !isHandRaised;
         setIsHandRaised(newState);
@@ -424,6 +484,44 @@ function RoomInterface({
         }
     };
 
+    // ── Poll Handlers ──
+    const handleCreatePoll = () => {
+        if (!pollQuestion.trim() || pollOptions.some(o => !o.trim())) return;
+        const options = pollOptions.map((text, i) => ({ id: i.toString(), text, votes: 0 }));
+
+        // Setup local state
+        setActivePoll({ question: pollQuestion, options, voted: false });
+
+        // Broadcast
+        const payload = JSON.stringify({ type: "START_POLL", question: pollQuestion, options });
+        sendPollData(new TextEncoder().encode(payload), { reliable: true });
+
+        setPollQuestion("");
+        setPollOptions(["", ""]);
+    };
+
+    const handleVote = (optionId: string) => {
+        if (!activePoll || activePoll.voted) return;
+
+        // Local state
+        setActivePoll(prev => prev ? {
+            ...prev,
+            voted: true,
+            options: prev.options.map(o => o.id === optionId ? { ...o, votes: o.votes + 1 } : o)
+        } : null);
+
+        // Broadcast
+        const payload = JSON.stringify({ type: "VOTE", optionId });
+        sendPollData(new TextEncoder().encode(payload), { reliable: true });
+    };
+
+    const handleEndPoll = () => {
+        setActivePoll(null);
+        setIsPollOpen(false);
+        const payload = JSON.stringify({ type: "END_POLL" });
+        sendPollData(new TextEncoder().encode(payload), { reliable: true });
+    };
+
     // Participants available to receive token (exclude self)
     const otherParticipants = participants.filter(p => p.identity !== address);
 
@@ -431,34 +529,6 @@ function RoomInterface({
     const formattedBalance = vaultBalance;
 
     // Listen for incoming payment notifications via LiveKit
-    useEffect(() => {
-        if (incomingPayment) {
-            try {
-                const data = JSON.parse(new TextDecoder().decode(incomingPayment.payload));
-                // Only show/save if this payment is addressed to me
-                if (data.to === address) {
-                    setPaymentNotif({ from: data.from, amount: data.amount });
-                    setTimeout(() => setPaymentNotif(null), 6000);
-                    // Refresh recipient's balance immediately
-                    refetchVault();
-                    // Save received tx to my history so it appears in dashboard
-                    if (address) {
-                        saveTx(address, {
-                            txHash: "",  // no hash available on recipient side
-                            from: data.from,
-                            fromAddress: data.fromAddress || "",
-                            to: userIdentifier,
-                            toAddress: address,
-                            amount: data.amount,
-                            symbol: TOKEN_SYMBOL,
-                            timestamp: Date.now(),
-                            direction: "received"
-                        });
-                    }
-                }
-            } catch (e) { console.error(e); }
-        }
-    }, [incomingPayment, address]);
 
     return (
         <div className="flex flex-col flex-1 relative overflow-hidden">
@@ -467,8 +537,8 @@ function RoomInterface({
             <div className="absolute top-2 left-2 md:top-4 md:left-6 z-20 flex flex-wrap items-center gap-2 md:gap-4 max-w-[calc(100vw-80px)]">
                 {/* Username + shield badge */}
                 <div className="flex items-center gap-2 px-3 py-1.5 bg-black/40 backdrop-blur-md rounded-lg border border-white/5 shadow-xl">
-                    <div className="w-5 h-5 relative">
-                        <Image src="/assets/logos/logo.png" alt="Room" fill className="object-contain" />
+                    <div className="w-5 h-5 rounded-full overflow-hidden shrink-0 relative bg-white/10">
+                        <img src={getProfilePic(address)} alt="Avatar" className="w-full h-full object-cover" />
                     </div>
                     <span className="text-[13px] font-bold tracking-tight text-white/90">{displayName || shortenedAddress}</span>
                     <div className="ml-2 flex items-center gap-1.5">
@@ -555,7 +625,9 @@ function RoomInterface({
                                 </div>
                                 <div className="md:w-[220px] md:h-full h-[120px] w-full shrink-0">
                                     <CarouselLayout tracks={tracks as TrackReferenceOrPlaceholder[]}>
-                                        <ParticipantTile />
+                                        <ParticipantTile>
+                                            <CustomAvatarOverlay />
+                                        </ParticipantTile>
                                     </CarouselLayout>
                                 </div>
                             </FocusLayoutContainer>
@@ -564,7 +636,9 @@ function RoomInterface({
                                 tracks={tracks as TrackReferenceOrPlaceholder[]}
                                 style={{ height: "100%", width: "100%" }}
                             >
-                                <ParticipantTile />
+                                <ParticipantTile>
+                                    <CustomAvatarOverlay />
+                                </ParticipantTile>
                             </GridLayout>
                         )}
                     </div>
@@ -629,12 +703,12 @@ function RoomInterface({
                                     <div className="flex items-center gap-1">
                                         <button type="button" className="p-2 hover:bg-white/5 rounded-lg text-gray-400"><Paperclip size={18} /></button>
                                         <button type="button" className="p-2 hover:bg-white/5 rounded-lg text-gray-400"><SmilePlus size={18} /></button>
-                                        {/* Gift/Send USDC button */}
+                                        {/* Gift/Send STRK button */}
                                         <button
                                             type="button"
                                             onClick={() => openSendUsdc()}
                                             className="p-2 hover:bg-yellow-500/10 rounded-lg text-gray-400 hover:text-yellow-400 transition-all"
-                                            title="Send USDC"
+                                            title="Send STRK"
                                         >
                                             <Gift size={18} />
                                         </button>
@@ -725,11 +799,19 @@ function RoomInterface({
                     />
                     <div className="w-px h-8 bg-white/5 mx-2" />
 
-                    {/* ── Send USDC Button ── */}
+                    {/* ── Poll Button ── */}
+                    <ControlButton
+                        icon={<FileText className={activePoll ? "text-blue-400 animate-pulse" : ""} />}
+                        label="Poll"
+                        onClick={() => setIsPollOpen(true)}
+                    />
+                    <div className="w-px h-8 bg-white/5 mx-2" />
+
+                    {/* ── Send STRK Button ── */}
                     <div className="relative">
                         <ControlButton
                             icon={<Image src="/assets/images/strk-logo.png" alt="STRK" width={22} height={22} className="object-contain" />}
-                            label="Send USDC"
+                            label="Send STRK"
                             onClick={() => openSendUsdc()}
                         />
                     </div>
@@ -766,25 +848,18 @@ function RoomInterface({
                 </div>
             </div>
 
-            {/* ── Send USDC Modal ── */}
+            {/* ── Send STRK Modal ── */}
             {isSendUsdcOpen && (
-                <div
-                    className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200"
-                    onClick={(e) => { if (e.target === e.currentTarget) { setIsSendUsdcOpen(false); } }}
-                >
-                    <div className="bg-[#111112] border border-white/10 rounded-3xl w-full max-w-[440px] shadow-2xl animate-in zoom-in-95 duration-200 overflow-hidden">
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setIsSendUsdcOpen(false)} />
+                    <div className="relative bg-[#1C1C1E] border border-white/10 w-full max-w-md rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
 
                         {/* Modal Header */}
-                        <div className="flex items-center justify-between p-6 border-b border-white/5">
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 bg-yellow-500/10 rounded-xl flex items-center justify-center">
-                                    <Image src="/assets/images/strk-logo.png" alt="STRK" width={20} height={20} className="object-contain" />
-                                </div>
-                                <div>
-                                    <h2 className="text-[17px] font-bold">Send STRK</h2>
-                                    <p className="text-[12px] text-gray-500">Starknet · inside Room Vault</p>
-                                </div>
-                            </div>
+                        <div className="px-6 py-5 border-b border-white/5 flex items-center justify-between bg-black/20">
+                            <h2 className="text-[18px] font-bold flex items-center gap-2">
+                                <Image src="/assets/images/strk-logo.png" alt="STRK" width={20} height={20} className="object-contain" />
+                                Send STRK
+                            </h2>
                             <button
                                 onClick={() => setIsSendUsdcOpen(false)}
                                 className="p-2 hover:bg-white/5 rounded-xl text-gray-400 hover:text-white transition-colors"
@@ -941,6 +1016,117 @@ function RoomInterface({
                                     )}
                                 </>
                             )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ── Poll Modal ── */}
+            {isPollOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setIsPollOpen(false)} />
+                    <div className="relative bg-[#1C1C1E] border border-white/10 w-full max-w-md rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                        {/* Modal Header */}
+                        <div className="px-6 py-5 border-b border-white/5 flex items-center justify-between bg-black/20">
+                            <h2 className="text-[18px] font-bold flex items-center gap-2">
+                                <FileText size={20} className="text-blue-400" />
+                                {activePoll ? "Live Poll" : "Create a Poll"}
+                            </h2>
+                            <button onClick={() => setIsPollOpen(false)} className="p-2 hover:bg-white/5 rounded-xl text-gray-400 hover:text-white transition-colors">
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        <div className="p-6">
+                            {!activePoll && isHost ? (
+                                /* Create Poll View */
+                                <div className="flex flex-col gap-4">
+                                    <input
+                                        type="text"
+                                        placeholder="Ask a question..."
+                                        value={pollQuestion}
+                                        onChange={e => setPollQuestion(e.target.value)}
+                                        className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-[14px] text-white focus:border-blue-500/50 outline-none"
+                                    />
+                                    {pollOptions.map((opt, i) => (
+                                        <div key={i} className="flex items-center gap-2">
+                                            <input
+                                                type="text"
+                                                placeholder={`Option ${i + 1}`}
+                                                value={opt}
+                                                onChange={e => {
+                                                    const newArr = [...pollOptions];
+                                                    newArr[i] = e.target.value;
+                                                    setPollOptions(newArr);
+                                                }}
+                                                className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-[14px] text-white focus:border-blue-500/50 outline-none"
+                                            />
+                                            {i > 1 && (
+                                                <button onClick={() => setPollOptions(pollOptions.filter((_, idx) => idx !== i))} className="p-2 text-red-400 hover:bg-red-400/10 rounded-lg"><X size={16} /></button>
+                                            )}
+                                        </div>
+                                    ))}
+                                    {pollOptions.length < 5 && (
+                                        <button onClick={() => setPollOptions([...pollOptions, ""])} className="text-[13px] text-blue-400 font-bold hover:underline self-start mt-1">
+                                            + Add Option
+                                        </button>
+                                    )}
+                                    <button
+                                        onClick={handleCreatePoll}
+                                        disabled={!pollQuestion.trim() || pollOptions.some(o => !o.trim())}
+                                        className="w-full mt-4 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-bold py-3 rounded-xl transition-all"
+                                    >
+                                        Start Poll
+                                    </button>
+                                </div>
+                            ) : !activePoll && !isHost ? (
+                                <div className="py-8 text-center text-gray-400">
+                                    <p>No active poll right now.</p>
+                                    <p className="text-[12px] mt-1">Only the host can create polls.</p>
+                                </div>
+                            ) : activePoll ? (
+                                /* View/Vote Poll View */
+                                <div className="flex flex-col gap-5">
+                                    <h3 className="text-[16px] font-bold leading-tight">{activePoll.question}</h3>
+
+                                    <div className="flex flex-col gap-3">
+                                        {activePoll.options.map(opt => {
+                                            const totalVotes = activePoll.options.reduce((acc, o) => acc + o.votes, 0);
+                                            const percent = totalVotes === 0 ? 0 : Math.round((opt.votes / totalVotes) * 100);
+
+                                            return (
+                                                <div
+                                                    key={opt.id}
+                                                    onClick={() => !activePoll.voted && handleVote(opt.id)}
+                                                    className={`relative overflow-hidden border rounded-xl p-4 transition-all ${activePoll.voted
+                                                        ? "border-white/10 bg-white/5 cursor-default"
+                                                        : "border-white/20 hover:border-blue-500/50 hover:bg-white/5 cursor-pointer"
+                                                        }`}
+                                                >
+                                                    {activePoll.voted && (
+                                                        <div className="absolute inset-0 bg-blue-500/20" style={{ width: `${percent}%`, transition: "width 0.5s ease-out" }} />
+                                                    )}
+                                                    <div className="relative z-10 flex items-center justify-between">
+                                                        <span className="text-[14px] font-medium">{opt.text}</span>
+                                                        {activePoll.voted && <span className="text-[13px] font-bold">{percent}%</span>}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+
+                                    <div className="flex items-center justify-between mt-2 pt-4 border-t border-white/5">
+                                        <span className="text-[12px] text-gray-400">
+                                            {activePoll.options.reduce((acc, o) => acc + o.votes, 0)} votes
+                                        </span>
+                                        {isHost && (
+                                            <button onClick={handleEndPoll} className="text-[12px] font-bold text-red-400 hover:bg-red-500/10 px-3 py-1.5 rounded-lg transition-colors">
+                                                End Poll
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            ) : null}
                         </div>
                     </div>
                 </div>
