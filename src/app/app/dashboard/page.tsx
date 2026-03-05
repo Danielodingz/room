@@ -43,6 +43,23 @@ import {
     Pencil,
 } from "lucide-react";
 
+const PROFILE_PICS = [
+    "/assets/avatars/profile1.jpg",
+    "/assets/avatars/profile2.jpg",
+    "/assets/avatars/profile3.jpg",
+    "/assets/avatars/profile4.jpg",
+    "/assets/avatars/profile6.jpg"
+];
+
+function getProfilePic(address?: string) {
+    if (!address) return PROFILE_PICS[0];
+    let hash = 0;
+    for (let i = 0; i < address.length; i++) {
+        hash = address.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    return PROFILE_PICS[Math.abs(hash) % PROFILE_PICS.length];
+}
+
 export default function DashboardPage() {
     const { address, isConnected, isConnecting, isReconnecting } = useAccount();
     const { disconnect } = useDisconnect();
@@ -111,6 +128,8 @@ export default function DashboardPage() {
     const shortenedAddress = address
         ? `${address.slice(0, 6)}...${address.slice(-4)}`
         : "";
+
+    const avatarUrl = getProfilePic(address);
 
     if (!hasMounted || isConnecting || isReconnecting) {
         return (
@@ -208,9 +227,10 @@ export default function DashboardPage() {
                         </div>
                         <div
                             onClick={() => setIsWalletOpen(true)}
-                            className="w-8 h-8 md:w-10 md:h-10 shrink-0 rounded-full bg-blue-500/10 flex items-center justify-center border border-white/10 shadow-sm overflow-hidden hover:border-white/20 transition-all cursor-pointer"
+                            className="w-8 h-8 md:w-10 md:h-10 shrink-0 rounded-full bg-white/5 border border-white/10 shadow-sm overflow-hidden hover:border-white/30 transition-all cursor-pointer group"
                         >
-                            <User size={18} className="text-blue-400" />
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={avatarUrl} alt="Profile Avatar" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
                         </div>
                     </div>
                 </header>
