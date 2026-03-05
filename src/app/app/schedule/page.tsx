@@ -7,7 +7,7 @@ import Image from "next/image";
 import {
     ArrowLeft, Calendar, Clock, Globe, Lock, Users, Video,
     Radio, ChevronDown, Check, Loader2, CheckCircle2, Shield,
-    FileText, Hash, Copy, ExternalLink, Link2
+    FileText, Hash, Copy, ExternalLink, Link2, ImageIcon, X, Upload
 } from "lucide-react";
 import { saveScheduledMeeting, ScheduledMeeting } from "@/lib/scheduledMeetings";
 
@@ -98,6 +98,18 @@ export default function SchedulePage() {
     const [savedMeeting, setSavedMeeting] = useState<ScheduledMeeting | null>(null);
     const [copiedId, setCopiedId] = useState(false);
     const [copiedLink, setCopiedLink] = useState(false);
+    const [coverImage, setCoverImage] = useState<string | null>(null);
+    const [isDragOver, setIsDragOver] = useState(false);
+    const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+    const handleImageFile = (file: File) => {
+        if (!file.type.startsWith("image/")) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            setCoverImage(e.target?.result as string);
+        };
+        reader.readAsDataURL(file);
+    };
 
     useEffect(() => {
         setHasMounted(true);
@@ -145,6 +157,7 @@ export default function SchedulePage() {
             passcode: isPublic ? "" : passcode.trim(),
             maxParticipants,
             enableRecording,
+            coverImage: coverImage || undefined,
             createdAt: Date.now(),
             hostAddress: address,
         };
@@ -223,7 +236,85 @@ export default function SchedulePage() {
                         />
                     </div>
 
-                    {/* Date + Time row */}
+                    {/* Cover Image */}
+                    <div className="flex flex-col gap-2">
+                        <label className="flex items-center gap-2 text-[12px] font-bold text-gray-400 uppercase tracking-widest">
+                            <ImageIcon size={14} />Cover Image
+                            <span className="text-gray-600 normal-case font-medium">optional</span>
+                        </label>
+
+                        {/* Hidden file input */}
+                        <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={e => {
+                                const file = e.target.files?.[0];
+                                if (file) handleImageFile(file);
+                            }}
+                        />
+
+                        {coverImage ? (
+                            /* Preview */
+                            <div className="relative rounded-2xl overflow-hidden border border-white/10 group">
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img
+                                    src={coverImage}
+                                    alt="Cover preview"
+                                    className="w-full h-[180px] object-cover"
+                                />
+                                {/* Dark overlay on hover */}
+                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-all flex items-center justify-center gap-3 opacity-0 group-hover:opacity-100">
+                                    <button
+                                        type="button"
+                                        onClick={() => fileInputRef.current?.click()}
+                                        className="px-4 py-2 bg-white/20 backdrop-blur-sm rounded-xl text-white font-bold text-[13px] flex items-center gap-2 hover:bg-white/30 transition-all"
+                                    >
+                                        <Upload size={14} /> Change
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setCoverImage(null)}
+                                        className="p-2 bg-red-500/20 backdrop-blur-sm rounded-xl text-red-400 hover:bg-red-500/30 transition-all"
+                                        title="Remove image"
+                                    >
+                                        <X size={16} />
+                                    </button>
+                                </div>
+                            </div>
+                        ) : (
+                            /* Drop zone */
+                            <button
+                                type="button"
+                                onClick={() => fileInputRef.current?.click()}
+                                onDragOver={e => { e.preventDefault(); setIsDragOver(true); }}
+                                onDragLeave={() => setIsDragOver(false)}
+                                onDrop={e => {
+                                    e.preventDefault();
+                                    setIsDragOver(false);
+                                    const file = e.dataTransfer.files?.[0];
+                                    if (file) handleImageFile(file);
+                                }}
+                                className={`w-full h-[160px] rounded-2xl border-2 border-dashed flex flex-col items-center justify-center gap-3 transition-all ${isDragOver
+                                    ? "border-blue-500/60 bg-blue-500/5 scale-[1.01]"
+                                    : "border-white/10 bg-white/[0.02] hover:border-white/20 hover:bg-white/[0.04]"
+                                    }`}
+                            >
+                                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-colors ${isDragOver ? "bg-blue-500/20" : "bg-white/5"}`}>
+                                    <ImageIcon size={22} className={isDragOver ? "text-blue-400" : "text-gray-500"} />
+                                </div>
+                                <div className="text-center">
+                                    <p className={`text-[14px] font-bold transition-colors ${isDragOver ? "text-blue-400" : "text-gray-400"}`}>
+                                        {isDragOver ? "Drop to upload" : "Upload cover image"}
+                                    </p>
+                                    <p className="text-[12px] text-gray-600 mt-0.5">Click or drag & drop · JPG, PNG, GIF, WEBP</p>
+                                </div>
+                            </button>
+                        )}
+                    </div>
+
+
                     <div className="grid grid-cols-2 gap-4">
                         <div className="flex flex-col gap-2">
                             <label className="flex items-center gap-2 text-[12px] font-bold text-gray-400 uppercase tracking-widest">
@@ -404,6 +495,17 @@ export default function SchedulePage() {
                     {status === "done" && savedMeeting ? (
                         /* ── Success / Invite Card ── */
                         <div className="flex flex-col gap-5 animate-in fade-in zoom-in-95 duration-300">
+                            {/* Cover image banner (if uploaded) */}
+                            {savedMeeting.coverImage && (
+                                <div className="rounded-3xl overflow-hidden border border-white/10">
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img
+                                        src={savedMeeting.coverImage}
+                                        alt="Meeting cover"
+                                        className="w-full h-[160px] object-cover"
+                                    />
+                                </div>
+                            )}
                             {/* Big checkmark */}
                             <div className="bg-green-500/10 border border-green-500/20 rounded-3xl p-6 flex flex-col items-center gap-3 text-center">
                                 <div className="w-14 h-14 bg-green-500/20 rounded-full flex items-center justify-center">
@@ -425,8 +527,8 @@ export default function SchedulePage() {
                                     <button
                                         onClick={handleCopyId}
                                         className={`p-2 rounded-xl transition-all active:scale-90 ${copiedId
-                                                ? "bg-green-500/20 text-green-400"
-                                                : "hover:bg-white/10 text-gray-400 hover:text-white"
+                                            ? "bg-green-500/20 text-green-400"
+                                            : "hover:bg-white/10 text-gray-400 hover:text-white"
                                             }`}
                                         title="Copy meeting ID"
                                     >
@@ -446,8 +548,8 @@ export default function SchedulePage() {
                                     <button
                                         onClick={handleCopyLink}
                                         className={`p-2 rounded-xl transition-all active:scale-90 shrink-0 ${copiedLink
-                                                ? "bg-green-500/20 text-green-400"
-                                                : "hover:bg-white/10 text-gray-400 hover:text-white"
+                                            ? "bg-green-500/20 text-green-400"
+                                            : "hover:bg-white/10 text-gray-400 hover:text-white"
                                             }`}
                                         title="Copy link"
                                     >
@@ -540,8 +642,8 @@ export default function SchedulePage() {
                                 onClick={handleSave}
                                 disabled={!canSave || status !== "idle"}
                                 className={`w-full py-5 rounded-2xl font-black text-[16px] transition-all active:scale-95 flex items-center justify-center gap-3 shadow-xl ${canSave
-                                        ? "bg-blue-500 hover:bg-blue-400 text-white shadow-blue-500/20"
-                                        : "bg-white/5 text-white/30 cursor-not-allowed"
+                                    ? "bg-blue-500 hover:bg-blue-400 text-white shadow-blue-500/20"
+                                    : "bg-white/5 text-white/30 cursor-not-allowed"
                                     }`}
                             >
                                 {status === "saving" && <Loader2 size={20} className="animate-spin" />}

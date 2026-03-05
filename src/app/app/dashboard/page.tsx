@@ -374,50 +374,61 @@ export default function DashboardPage() {
                                 const timeStr = dt.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
                                 const durationStr = m.duration < 60 ? `${m.duration}m` : `${Math.floor(m.duration / 60)}h${m.duration % 60 ? ` ${m.duration % 60}m` : ""}`;
                                 return (
-                                    <div key={m.id} className="bg-[#111112] border border-white/8 rounded-3xl p-5 flex flex-col gap-4 hover:border-white/15 transition-all group">
-                                        <div className="flex items-start justify-between gap-2">
-                                            <div className="flex-1 min-w-0">
-                                                <p className="font-black text-[15px] truncate">{m.topic}</p>
-                                                <div className="flex items-center gap-1.5 mt-1">
-                                                    {m.isPublic
-                                                        ? <Globe size={11} className="text-blue-400" />
-                                                        : <Lock size={11} className="text-yellow-400" />}
-                                                    <span className={`text-[11px] font-bold ${m.isPublic ? "text-blue-400" : "text-yellow-400"}`}>
-                                                        {m.isPublic ? "Public" : "Private"}
-                                                    </span>
-                                                    <span className="text-gray-600 text-[11px]">· {m.maxParticipants} max</span>
+                                    <div key={m.id} className="bg-[#111112] border border-white/8 rounded-3xl overflow-hidden flex flex-col gap-0 hover:border-white/15 transition-all group">
+                                        {/* Cover image banner */}
+                                        {m.coverImage && (
+                                            // eslint-disable-next-line @next/next/no-img-element
+                                            <img
+                                                src={m.coverImage}
+                                                alt={m.topic}
+                                                className="w-full h-[120px] object-cover"
+                                            />
+                                        )}
+                                        <div className="p-5 flex flex-col gap-4">
+                                            <div className="flex items-start justify-between gap-2">
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="font-black text-[15px] truncate">{m.topic}</p>
+                                                    <div className="flex items-center gap-1.5 mt-1">
+                                                        {m.isPublic
+                                                            ? <Globe size={11} className="text-blue-400" />
+                                                            : <Lock size={11} className="text-yellow-400" />}
+                                                        <span className={`text-[11px] font-bold ${m.isPublic ? "text-blue-400" : "text-yellow-400"}`}>
+                                                            {m.isPublic ? "Public" : "Private"}
+                                                        </span>
+                                                        <span className="text-gray-600 text-[11px]">· {m.maxParticipants} max</span>
+                                                    </div>
+                                                </div>
+                                                <button
+                                                    onClick={() => { if (address) { deleteScheduledMeeting(address, m.id); reloadScheduled(); } }}
+                                                    className="p-1.5 rounded-lg text-gray-600 hover:text-red-400 hover:bg-red-500/10 transition-all opacity-0 group-hover:opacity-100"
+                                                    title="Remove"
+                                                >
+                                                    <Trash2 size={14} />
+                                                </button>
+                                            </div>
+                                            <div className="flex items-center gap-3 text-[12px] text-gray-400">
+                                                <div className="flex items-center gap-1.5">
+                                                    <Calendar size={12} className="text-blue-400" />
+                                                    <span>{dateStr}</span>
+                                                </div>
+                                                <div className="flex items-center gap-1.5">
+                                                    <Clock size={12} className="text-green-400" />
+                                                    <span>{timeStr} · {durationStr}</span>
                                                 </div>
                                             </div>
+                                            {/* Meeting ID + Copy Link */}
+                                            <MeetingInviteRow meetingId={m.id} />
+                                            {m.description && (
+                                                <p className="text-[12px] text-gray-500 line-clamp-2 leading-relaxed">{m.description}</p>
+                                            )}
                                             <button
-                                                onClick={() => { if (address) { deleteScheduledMeeting(address, m.id); reloadScheduled(); } }}
-                                                className="p-1.5 rounded-lg text-gray-600 hover:text-red-400 hover:bg-red-500/10 transition-all opacity-0 group-hover:opacity-100"
-                                                title="Remove"
+                                                onClick={() => router.push(`/app/room/${m.id}?mode=create`)}
+                                                className="w-full flex items-center justify-center gap-2 py-3 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 font-black rounded-2xl transition-all active:scale-95 text-[13px] border border-blue-500/20 hover:border-blue-500/30"
                                             >
-                                                <Trash2 size={14} />
+                                                <Play size={14} />
+                                                Start Meeting
                                             </button>
                                         </div>
-                                        <div className="flex items-center gap-3 text-[12px] text-gray-400">
-                                            <div className="flex items-center gap-1.5">
-                                                <Calendar size={12} className="text-blue-400" />
-                                                <span>{dateStr}</span>
-                                            </div>
-                                            <div className="flex items-center gap-1.5">
-                                                <Clock size={12} className="text-green-400" />
-                                                <span>{timeStr} · {durationStr}</span>
-                                            </div>
-                                        </div>
-                                        {/* Meeting ID + Copy Link */}
-                                        <MeetingInviteRow meetingId={m.id} />
-                                        {m.description && (
-                                            <p className="text-[12px] text-gray-500 line-clamp-2 leading-relaxed">{m.description}</p>
-                                        )}
-                                        <button
-                                            onClick={() => router.push(`/app/room/${m.id}?mode=create`)}
-                                            className="w-full flex items-center justify-center gap-2 py-3 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 font-black rounded-2xl transition-all active:scale-95 text-[13px] border border-blue-500/20 hover:border-blue-500/30"
-                                        >
-                                            <Play size={14} />
-                                            Start Meeting
-                                        </button>
                                     </div>
                                 );
                             })}

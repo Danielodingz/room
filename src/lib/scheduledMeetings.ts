@@ -10,6 +10,7 @@ export interface ScheduledMeeting {
     passcode: string;
     maxParticipants: number;
     enableRecording: boolean;
+    coverImage?: string;   // base64 data URL
     createdAt: number;     // unix ms
     hostAddress: string;
 }
