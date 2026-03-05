@@ -391,6 +391,9 @@ function RoomInterface({
             setTxHash(txHash);
             setTxStatus("success");
 
+            // Refresh sender's balance immediately after successful send
+            refetchVault();
+
             // Save to localStorage history (shows in dashboard)
             if (address) {
                 saveTx(address, {
@@ -436,6 +439,8 @@ function RoomInterface({
                 if (data.to === address) {
                     setPaymentNotif({ from: data.from, amount: data.amount });
                     setTimeout(() => setPaymentNotif(null), 6000);
+                    // Refresh recipient's balance immediately
+                    refetchVault();
                     // Save received tx to my history so it appears in dashboard
                     if (address) {
                         saveTx(address, {

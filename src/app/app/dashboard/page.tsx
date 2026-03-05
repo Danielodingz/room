@@ -123,8 +123,7 @@ export default function DashboardPage() {
                 <nav className="flex-1 flex flex-col gap-2 px-3">
                     <SidebarItem icon={<Home size={22} />} label="Home" active={!isWalletOpen} onClick={() => setIsWalletOpen(false)} />
                     <SidebarItem icon={<Wallet size={22} />} label="Wallet" active={isWalletOpen} onClick={() => setIsWalletOpen(true)} />
-                    <SidebarItem icon={<MessageSquare size={22} />} label="Team Chat" />
-                    <SidebarItem icon={<Video size={22} />} label="Meetings" />
+
                     <SidebarItem icon={<Zap size={22} />} label="Hackathon" />
                     <SidebarItem icon={<User size={22} />} label="Class" />
                     <SidebarItem icon={<Settings size={22} />} label="Settings" />
@@ -151,10 +150,7 @@ export default function DashboardPage() {
                     <Wallet size={20} />
                     <span className="text-[10px] font-bold">Wallet</span>
                 </button>
-                <button className="p-2 flex flex-col items-center gap-1 text-gray-400">
-                    <Video size={20} />
-                    <span className="text-[10px] font-bold">Meetings</span>
-                </button>
+
                 <button onClick={() => disconnect()} className="p-2 flex flex-col items-center gap-1 text-red-400">
                     <LogOut size={20} />
                     <span className="text-[10px] font-bold">Exit</span>
