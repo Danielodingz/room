@@ -8,6 +8,9 @@ const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 export const metadata: Metadata = {
     title: "Room | Starknet-native video meeting platform",
     description: "Send USDC live during video calls on the most secure video meeting platform.",
+    icons: {
+        icon: "/favicon.png",
+    },
 };
 
 import { StarknetProvider } from "@/components/StarknetProvider";
