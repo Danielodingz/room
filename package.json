@@ -37,5 +37,16 @@
     "prop-types": "^15.8.1",
     "tailwindcss": "^3.3.0",
     "typescript": "^5"
+  },
+  "overrides": {
+    "starknetkit": {
+      "starknet": "^8.9.2",
+      "@argent/x-ui": {
+        "starknet": "^8.9.2"
+      },
+      "@cartridge/controller": {
+        "starknet": "^8.9.2"
+      }
+    }
   }
 }
