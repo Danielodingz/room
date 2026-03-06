@@ -6,7 +6,7 @@ export default function Services() {
             <div className="mb-20 space-y-4">
                 <span className="text-[11.6px] font-bold tracking-widest text-[#FF6830] uppercase block text-center">SERVICES</span>
                 <h2 className="heading-2 max-w-[786px] mx-auto">
-                    One platform. <br /> Endless ways to work together.
+                    Room. <br /> Everything You Need to Host, Learn, and Build Together.
                 </h2>
             </div>
 
@@ -40,8 +40,8 @@ export default function Services() {
                     />
                     <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black to-transparent" />
                     <div className="relative z-10 text-white space-y-4">
-                        <h3 className="text-[33px] font-bold leading-none tracking-tight">Short-form edits</h3>
-                        <p className="text-[14.8px] opacity-70">Built to stop the scroll and multiply engagement.</p>
+                        <h3 className="text-[33px] font-bold leading-none tracking-tight">Schedule a Meeting</h3>
+                        <p className="text-[14.8px] opacity-70">Plan and organize meetings effortlessly—set a time, invite participants, and bring your community together.</p>
                     </div>
                 </div>
 
@@ -49,7 +49,7 @@ export default function Services() {
                     <div className="absolute inset-0 p-10 flex flex-col justify-center z-10 pointer-events-none">
                         <div className="max-w-[400px] space-y-2 pointer-events-auto">
                             <h3 className="text-[22.8px] font-bold text-white">Send Token Gifts</h3>
-                            <p className="text-[12.6px] text-white opacity-70">Creating high-quality visuals as clicks starts before the video plays.</p>
+                            <p className="text-[12.6px] text-white opacity-70">Instantly reward participants by sending tokens directly to their wallets.</p>
                         </div>
                     </div>
                     <div className="absolute right-0 top-0 bottom-0 w-[350px] pointer-events-none">
