@@ -13,7 +13,7 @@ export default function Hero() {
                     </div>
 
                     <h1 className="text-[40px] md:text-[82px] font-bold leading-[1.1] md:leading-[0.95] tracking-[-0.04em] text-[#121212] mb-6 md:mb-8 text-center md:text-left">
-                        Build, Learn, and Collaborate in One Room
+                        Build. Learn, and Collaborate in One Room
                     </h1>
 
                     <p className="text-[16px] md:text-[18px] leading-[1.6] text-[#121212]/60 max-w-[380px] mb-8 md:mb-10 text-center md:text-left mx-auto md:mx-0">
