@@ -1,6 +1,7 @@
 import { Play } from "lucide-react";
 
 import Image from "next/image";
+import Link from "next/link";
 
 export default function Hero() {
     return (
@@ -21,9 +22,9 @@ export default function Hero() {
                     </p>
 
                     <div className="flex flex-col sm:flex-row items-center gap-4 justify-center md:justify-start w-full sm:w-auto px-4 sm:px-0">
-                        <button className="pill-button-primary bg-[#121212] text-white w-full sm:w-auto">
+                        <Link href="/app" className="pill-button-primary bg-[#121212] text-white w-full sm:w-auto flex items-center justify-center">
                             Get started
-                        </button>
+                        </Link>
                         <button className="pill-button-secondary bg-white text-[#121212] border-[#D1D1D1] flex items-center gap-2 w-full sm:w-auto justify-center">
                             <div className="w-[18px] h-[18px] relative">
                                 <Image
