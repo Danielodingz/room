@@ -44,7 +44,7 @@ export function StarknetProvider({ children }: { children: React.ReactNode }) {
         rpc: () => ({
             nodeUrl: process.env.NEXT_PUBLIC_STARKNET_RPC_URL ||
                 "https://starknet-sepolia.g.alchemy.com/starknet/version/rpc/v0_8/demo",
-            requestTimeout: 90000 // 90 second timeout to prevent aggressive "Check Wallet" messages
+            requestTimeout: 300000 // 5 minute timeout to be infinitely patient while user reviews wallet signature
         })
     });
 

@@ -646,11 +646,11 @@ function WalletDrawer({ isOpen, onClose, txHistory, reloadTxHistory }: { isOpen:
             refetchVault();
         } catch (err: any) {
             const parsedError = parseStarknetError(err);
-            if (parsedError.startsWith("TIMEOUT:")) {
-                setWithdrawError("Waiting for Wallet... Please open your Argent X extension directly, as the request is likely pending there.");
-            } else {
-                setWithdrawError(parsedError);
+            if (parsedError.startsWith("SILENT_TIMEOUT:")) {
+                console.log("Withdrawal handshake slow, remaining in pending state...");
+                return;
             }
+            setWithdrawError(parsedError);
             setWithdrawStatus("error");
         } finally {
             isProcessingRef.current = false;
@@ -703,11 +703,11 @@ function WalletDrawer({ isOpen, onClose, txHistory, reloadTxHistory }: { isOpen:
             refetchVault();
         } catch (err: any) {
             const parsedError = parseStarknetError(err);
-            if (parsedError.startsWith("TIMEOUT:")) {
-                setDepositError("Waiting for Wallet... Please open your Argent X extension directly, as the request is likely pending there.");
-            } else {
-                setDepositError(parsedError);
+            if (parsedError.startsWith("SILENT_TIMEOUT:")) {
+                console.log("Deposit handshake slow, remaining in pending state...");
+                return;
             }
+            setDepositError(parsedError);
             setDepositStatus("error");
         } finally {
             isProcessingRef.current = false;
@@ -762,11 +762,11 @@ function WalletDrawer({ isOpen, onClose, txHistory, reloadTxHistory }: { isOpen:
             }
         } catch (err: any) {
             const parsedError = parseStarknetError(err);
-            if (parsedError.startsWith("TIMEOUT:")) {
-                setSendError("Waiting for Wallet... Please open your Argent X extension directly, as the request is likely pending there.");
-            } else {
-                setSendError(parsedError);
+            if (parsedError.startsWith("SILENT_TIMEOUT:")) {
+                console.log("Send handshake slow, remaining in pending state...");
+                return;
             }
+            setSendError(parsedError);
             setSendStatus("error");
         } finally {
             isProcessingRef.current = false;
@@ -1030,14 +1030,11 @@ function WalletDrawer({ isOpen, onClose, txHistory, reloadTxHistory }: { isOpen:
                                     </div>
 
                                     {depositStatus === 'error' && (
-                                        <div className={`rounded-2xl p-4 text-[13px] font-medium border ${depositError.includes("Waiting for Wallet")
-                                                ? "bg-blue-500/10 border-blue-500/20 text-blue-400"
-                                                : "bg-red-500/10 border-red-500/20 text-red-400"
-                                            }`}>
+                                        <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-4 text-red-400 text-[13px] font-medium">
                                             <div className="flex gap-3">
-                                                {depositError.includes("Waiting for Wallet") ? <Info size={16} className="shrink-0" /> : <AlertCircle size={16} className="shrink-0" />}
+                                                <AlertCircle size={16} className="shrink-0" />
                                                 <div>
-                                                    <p className="font-bold mb-1">{depositError.includes("Waiting for Wallet") ? "Confirm in Wallet" : "Deposit Failed"}</p>
+                                                    <p className="font-bold mb-1">Deposit Failed</p>
                                                     {depositError}
                                                 </div>
                                             </div>
@@ -1123,14 +1120,11 @@ function WalletDrawer({ isOpen, onClose, txHistory, reloadTxHistory }: { isOpen:
                                     </div>
 
                                     {sendStatus === 'error' && (
-                                        <div className={`rounded-2xl p-4 text-[13px] font-medium border ${sendError.includes("Waiting for Wallet")
-                                                ? "bg-blue-500/10 border-blue-500/20 text-blue-400"
-                                                : "bg-red-500/10 border-red-500/20 text-red-400"
-                                            }`}>
+                                        <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-4 text-red-400 text-[13px] font-medium">
                                             <div className="flex gap-3">
-                                                {sendError.includes("Waiting for Wallet") ? <Info size={16} className="shrink-0" /> : <AlertCircle size={16} className="shrink-0" />}
+                                                <AlertCircle size={16} className="shrink-0" />
                                                 <div>
-                                                    <p className="font-bold mb-1">{sendError.includes("Waiting for Wallet") ? "Confirm in Wallet" : "Transaction Failed"}</p>
+                                                    <p className="font-bold mb-1">Transaction Failed</p>
                                                     {sendError}
                                                 </div>
                                             </div>
@@ -1226,14 +1220,11 @@ function WalletDrawer({ isOpen, onClose, txHistory, reloadTxHistory }: { isOpen:
                                     </div>
 
                                     {withdrawStatus === 'error' && (
-                                        <div className={`rounded-2xl p-4 text-[13px] font-medium border ${withdrawError.includes("Waiting for Wallet")
-                                                ? "bg-blue-500/10 border-blue-500/20 text-blue-400"
-                                                : "bg-red-500/10 border-red-500/20 text-red-400"
-                                            }`}>
+                                        <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-4 text-red-400 text-[13px] font-medium">
                                             <div className="flex gap-3">
-                                                {withdrawError.includes("Waiting for Wallet") ? <Info size={16} className="shrink-0" /> : <AlertCircle size={16} className="shrink-0" />}
+                                                <AlertCircle size={16} className="shrink-0" />
                                                 <div>
-                                                    <p className="font-bold mb-1">{withdrawError.includes("Waiting for Wallet") ? "Confirm in Wallet" : "Withdrawal Failed"}</p>
+                                                    <p className="font-bold mb-1">Withdrawal Failed</p>
                                                     {withdrawError}
                                                 </div>
                                             </div>
