@@ -479,21 +479,9 @@ function RoomInterface({
         } catch (err: any) {
             console.error("Token send error:", err);
             const parsedError = parseStarknetError(err);
-            if (parsedError.startsWith("SILENT_TIMEOUT:")) {
-                // Do nothing, stay in pending state to be patient with the wallet
-                console.log("Wallet handshake slow, remaining in pending state...");
-                return;
-            }
             setTxError(parsedError);
             setTxStatus("error");
         } finally {
-            // Only release the lock if it wasn't a silent timeout 
-            // Actually, if it's a silent timeout, the promise rejected, so we MUST release the lock
-            // or the user can never click again if the wallet truly failed.
-            // But if we release the lock, they might double click.
-            // Let's only release if it's NOT a silent timeout? No, that's dangerous.
-            // If it's a silent timeout, we should probably keep isSendingRef.current = true 
-            // for a bit longer, but eventually we have to let them try again.
             isSendingRef.current = false;
         }
     };
@@ -926,19 +914,35 @@ function RoomInterface({
                             ) : txStatus === "error" ? (
                                 /* Error state */
                                 <div className="flex flex-col items-center gap-4 py-4">
-                                    <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center">
-                                        <AlertCircle size={32} className="text-red-400" />
+                                    <div className={`w-16 h-16 rounded-full flex items-center justify-center ${txError.includes("TIMEOUT:") ? "bg-blue-500/10" : "bg-red-500/10"}`}>
+                                        {txError.includes("TIMEOUT:") ? (
+                                            <Info size={32} className="text-blue-400" />
+                                        ) : (
+                                            <AlertCircle size={32} className="text-red-400" />
+                                        )}
                                     </div>
                                     <div className="text-center px-4">
-                                        <p className="text-[16px] font-bold text-red-400">Transaction Failed</p>
+                                        <p className={`text-[16px] font-bold ${txError.includes("TIMEOUT:") ? "text-blue-400" : "text-red-400"}`}>
+                                            {txError.includes("TIMEOUT:") ? "Confirm in Wallet" : "Transaction Failed"}
+                                        </p>
                                         <p className="text-[12px] text-gray-500 mt-1 max-w-[280px] break-words">{txError}</p>
                                     </div>
-                                    <button
-                                        onClick={() => setTxStatus("idle")}
-                                        className="px-6 py-2.5 bg-white/5 rounded-xl text-[13px] font-bold hover:bg-white/10 transition-colors"
-                                    >
-                                        Try Again
-                                    </button>
+                                    {!txError.includes("TIMEOUT:") && (
+                                        <button
+                                            onClick={() => setTxStatus("idle")}
+                                            className="px-6 py-2.5 bg-white/5 rounded-xl text-[13px] font-bold hover:bg-white/10 transition-colors"
+                                        >
+                                            Try Again
+                                        </button>
+                                    )}
+                                    {txError.includes("TIMEOUT:") && (
+                                        <button
+                                            onClick={() => setTxStatus("idle")}
+                                            className="px-6 py-2.5 bg-white/5 rounded-xl text-[13px] font-bold hover:bg-white/10 transition-colors mt-2 text-gray-400 hover:text-white"
+                                        >
+                                            I've checked, cancel
+                                        </button>
+                                    )}
                                 </div>
                             ) : (
                                 /* Normal send form */

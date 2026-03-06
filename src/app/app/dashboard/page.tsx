@@ -646,10 +646,6 @@ function WalletDrawer({ isOpen, onClose, txHistory, reloadTxHistory }: { isOpen:
             refetchVault();
         } catch (err: any) {
             const parsedError = parseStarknetError(err);
-            if (parsedError.startsWith("SILENT_TIMEOUT:")) {
-                console.log("Withdrawal handshake slow, remaining in pending state...");
-                return;
-            }
             setWithdrawError(parsedError);
             setWithdrawStatus("error");
         } finally {
@@ -703,10 +699,6 @@ function WalletDrawer({ isOpen, onClose, txHistory, reloadTxHistory }: { isOpen:
             refetchVault();
         } catch (err: any) {
             const parsedError = parseStarknetError(err);
-            if (parsedError.startsWith("SILENT_TIMEOUT:")) {
-                console.log("Deposit handshake slow, remaining in pending state...");
-                return;
-            }
             setDepositError(parsedError);
             setDepositStatus("error");
         } finally {
@@ -762,10 +754,6 @@ function WalletDrawer({ isOpen, onClose, txHistory, reloadTxHistory }: { isOpen:
             }
         } catch (err: any) {
             const parsedError = parseStarknetError(err);
-            if (parsedError.startsWith("SILENT_TIMEOUT:")) {
-                console.log("Send handshake slow, remaining in pending state...");
-                return;
-            }
             setSendError(parsedError);
             setSendStatus("error");
         } finally {

@@ -108,10 +108,8 @@ export function parseStarknetError(err: any): string {
         return "Insufficient vault balance to complete this transfer.";
     if (msg.includes("rejected") || msg.includes("cancelled") || msg.includes("user abort") || msg.includes("User abort"))
         return "Transaction was rejected or cancelled.";
-    if (msg.includes("execution has failed"))
-        return "Transaction execution failed on-chain. Make sure both wallets are activated on Starknet Sepolia.";
     if (msg.includes("Timeout") || msg.includes("timeout"))
-        return "SILENT_TIMEOUT: Waiting for wallet confirmation...";
+        return "TIMEOUT: The wallet connection is slow. Please check if Argent X is waiting for your confirmation!";
 
     // Return a shortened version for other errors
     return msg.length > 180 ? msg.slice(0, 180) + "…" : msg;

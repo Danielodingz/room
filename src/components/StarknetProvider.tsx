@@ -43,8 +43,8 @@ export function StarknetProvider({ children }: { children: React.ReactNode }) {
     const provider = jsonRpcProvider({
         rpc: () => ({
             nodeUrl: process.env.NEXT_PUBLIC_STARKNET_RPC_URL ||
-                "https://starknet-sepolia.g.alchemy.com/starknet/version/rpc/v0_8/demo",
-            requestTimeout: 300000 // 5 minute timeout to be infinitely patient while user reviews wallet signature
+                "https://starknet-sepolia.public.blastapi.io",
+            requestTimeout: 60000 // Reverting to sane 60s timeout for better responsiveness
         })
     });
 
