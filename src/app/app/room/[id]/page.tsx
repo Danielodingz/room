@@ -260,6 +260,7 @@ function RoomInterface({
     const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
     const [chatInput, setChatInput] = useState("");
     const [activeReaction, setActiveReaction] = useState<{ emoji: string, from: string } | null>(null);
+    const [isChatEmojiPickerOpen, setIsChatEmojiPickerOpen] = useState(false);
 
     // ── Token Send State ──
     const [isSendUsdcOpen, setIsSendUsdcOpen] = useState(false);
@@ -714,7 +715,32 @@ function RoomInterface({
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-1">
                                         <button type="button" className="p-2 hover:bg-white/5 rounded-lg text-gray-400"><Paperclip size={18} /></button>
-                                        <button type="button" className="p-2 hover:bg-white/5 rounded-lg text-gray-400"><SmilePlus size={18} /></button>
+                                        <div className="relative">
+                                            <button
+                                                type="button"
+                                                onClick={() => setIsChatEmojiPickerOpen(!isChatEmojiPickerOpen)}
+                                                className={`p-2 hover:bg-white/5 rounded-lg transition-colors ${isChatEmojiPickerOpen ? "bg-blue-500/10 text-blue-400" : "text-gray-400"}`}
+                                            >
+                                                <SmilePlus size={18} />
+                                            </button>
+                                            {isChatEmojiPickerOpen && (
+                                                <div className="absolute bottom-[calc(100%+12px)] left-0 bg-[#1C1C1E] border border-white/10 rounded-2xl p-2 flex flex-wrap gap-1 shadow-2xl z-[60] animate-in fade-in zoom-in-95 duration-150 w-[200px]">
+                                                    {["👍", "👏", "❤️", "😂", "🎉", "😮", "🔥", "🤩"].map(emoji => (
+                                                        <button
+                                                            key={emoji}
+                                                            type="button"
+                                                            onClick={() => {
+                                                                handleSendReaction(emoji);
+                                                                setIsChatEmojiPickerOpen(false);
+                                                            }}
+                                                            className="text-xl hover:bg-white/10 hover:scale-110 transition-all p-2 rounded-lg"
+                                                        >
+                                                            {emoji}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
                                         {/* Gift/Send STRK button */}
                                         <button
                                             type="button"
@@ -745,7 +771,7 @@ function RoomInterface({
             </div>
 
             {/* ── Bottom Toolbar ── */}
-            <div className="h-[80px] md:h-[96px] bg-[#0A0A0B]/80 backdrop-blur-xl border-t border-white/5 px-2 md:px-8 flex items-center justify-between z-40 relative shadow-[0_-20px_40px_-5px_rgba(0,0,0,0.4)] overflow-hidden w-full">
+            <div className="h-[80px] md:h-[96px] bg-[#0A0A0B]/80 backdrop-blur-xl border-t border-white/5 px-2 md:px-8 flex items-center justify-between z-40 relative shadow-[0_-20px_40px_-5px_rgba(0,0,0,0.4)] w-full">
 
                 {/* Left: Mic + Camera */}
                 <div className="flex items-center gap-1 min-w-fit shrink-0">

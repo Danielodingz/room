@@ -33,7 +33,7 @@ export default function Hero() {
                                     className="object-contain"
                                 />
                             </div>
-                            Live meeting
+                            Watch demo
                         </button>
                     </div>
                 </div>
