@@ -20,7 +20,7 @@ export function StarknetProvider({ children }: { children: React.ReactNode }) {
             braavos(),
         ],
         includeRecommended: "always",
-        order: "random"
+        order: "alphabetical"
     });
 
     const argentMobile = ArgentMobileConnector.init({

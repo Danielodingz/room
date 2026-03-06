@@ -70,6 +70,7 @@ export function toU256Calldata(amount: number): [string, string] {
     return [(raw % U128_MAX).toString(), (raw / U128_MAX).toString()];
 }
 
+
 /** Format a raw u256 ({low, high} or bigint) to human-readable STRK string */
 export function formatStrkAmount(raw: bigint | { low: bigint; high: bigint }): string {
     const HIGH_MULT = 340282366920938463463374607431768211456n;
@@ -80,4 +81,24 @@ export function formatStrkAmount(raw: bigint | { low: bigint; high: bigint }): s
         value = BigInt(raw.low.toString()) + BigInt(raw.high.toString()) * HIGH_MULT;
     }
     return (Number(value) / 1e18).toFixed(4);
+}
+
+// --- Error message parser ---
+export function parseStarknetError(err: any): string {
+    const msg: string = err?.message || err?.toString() || "Transaction failed";
+    console.error("Original Starknet Error:", msg);
+
+    if (msg.includes("is not deployed"))
+        return "The recipient's wallet is not yet activated on Starknet. They need to make at least one transaction on Sepolia to activate their account.";
+    if (msg.includes("insufficient") || msg.includes("balance"))
+        return "Insufficient vault balance to complete this transfer.";
+    if (msg.includes("rejected") || msg.includes("cancelled") || msg.includes("user abort") || msg.includes("User abort"))
+        return "Transaction was rejected or cancelled.";
+    if (msg.includes("execution has failed"))
+        return "Transaction execution failed on-chain. Make sure both wallets are activated on Starknet Sepolia.";
+    if (msg.includes("Timeout") || msg.includes("timeout"))
+        return "TIMEOUT: The wallet connection is taking too long. Please check your extension.";
+
+    // Return a shortened version for other errors
+    return msg.length > 180 ? msg.slice(0, 180) + "…" : msg;
 }

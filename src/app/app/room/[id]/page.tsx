@@ -12,7 +12,7 @@ import {
     ExternalLink, AtSign, DollarSign, FileText
 } from "lucide-react";
 import { useAccount } from "@starknet-react/core";
-import { ROOM_VAULT_ADDRESS, toU256Calldata, ROOM_VAULT_ABI, formatStrkAmount } from "@/lib/roomVault";
+import { ROOM_VAULT_ADDRESS, toU256Calldata, ROOM_VAULT_ABI, formatStrkAmount, parseStarknetError } from "@/lib/roomVault";
 import { getProfilePic } from "@/lib/profile";
 import { useReadContract } from "@starknet-react/core";
 import {
@@ -197,21 +197,6 @@ export default function MeetingRoomPage() {
             <RoomAudioRenderer />
         </LiveKitRoom>
     );
-}
-
-// ─── Error message parser ─────────────────────────────────────────────────────
-function parseStarknetError(err: any): string {
-    const msg: string = err?.message || err?.toString() || "Transaction failed";
-    if (msg.includes("is not deployed"))
-        return "The recipient's wallet is not yet activated on Starknet. They need to make at least one transaction on Sepolia to activate their account.";
-    if (msg.includes("insufficient") || msg.includes("balance"))
-        return "Insufficient vault balance to complete this transfer.";
-    if (msg.includes("rejected") || msg.includes("cancelled") || msg.includes("user abort"))
-        return "Transaction was rejected or cancelled.";
-    if (msg.includes("execution has failed"))
-        return "Transaction execution failed on-chain. Make sure both wallets are activated on Starknet Sepolia.";
-    // Return a shortened version for other errors
-    return msg.length > 180 ? msg.slice(0, 180) + "…" : msg;
 }
 
 // ─── Custom Avatar Overlay for Video Tiles ───────────────────────────────────────
@@ -494,7 +479,7 @@ function RoomInterface({
         } catch (err: any) {
             console.error("Token send error:", err);
             const parsedError = parseStarknetError(err);
-            if (parsedError.includes("Timeout") || parsedError.includes("User abort")) {
+            if (parsedError.startsWith("TIMEOUT:")) {
                 setTxError("Waiting for Wallet... Please open your Argent X extension directly, as the request is likely pending there.");
             } else {
                 setTxError(parsedError);

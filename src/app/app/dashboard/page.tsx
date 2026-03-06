@@ -5,7 +5,7 @@ import { useAccount, useDisconnect, useReadContract } from "@starknet-react/core
 import { loadTxHistory, saveTx, TxRecord } from "@/lib/txHistory";
 import { upcomingMeetings, ScheduledMeeting, deleteScheduledMeeting } from "@/lib/scheduledMeetings";
 import { useStrkBalance } from "@/lib/useStrkBalance";
-import { ROOM_VAULT_ADDRESS, ROOM_VAULT_ABI, STRK_ADDRESS, STRK_APPROVE_ABI, toU256Calldata, formatStrkAmount } from "@/lib/roomVault";
+import { ROOM_VAULT_ADDRESS, ROOM_VAULT_ABI, STRK_ADDRESS, STRK_APPROVE_ABI, toU256Calldata, formatStrkAmount, parseStarknetError } from "@/lib/roomVault";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
@@ -643,11 +643,11 @@ function WalletDrawer({ isOpen, onClose, txHistory, reloadTxHistory }: { isOpen:
             }
             refetchVault();
         } catch (err: any) {
-            const errorMsg = err?.message || "Withdrawal failed";
-            if (errorMsg.includes("Timeout") || errorMsg.includes("User abort")) {
+            const parsedError = parseStarknetError(err);
+            if (parsedError.startsWith("TIMEOUT:")) {
                 setWithdrawError("Waiting for Wallet... Please open your Argent X extension directly, as the request is likely pending there.");
             } else {
-                setWithdrawError(errorMsg);
+                setWithdrawError(parsedError);
             }
             setWithdrawStatus("error");
         } finally {
@@ -700,11 +700,11 @@ function WalletDrawer({ isOpen, onClose, txHistory, reloadTxHistory }: { isOpen:
             }
             refetchVault();
         } catch (err: any) {
-            const errorMsg = err?.message || "Deposit failed";
-            if (errorMsg.includes("Timeout") || errorMsg.includes("User abort")) {
+            const parsedError = parseStarknetError(err);
+            if (parsedError.startsWith("TIMEOUT:")) {
                 setDepositError("Waiting for Wallet... Please open your Argent X extension directly, as the request is likely pending there.");
             } else {
-                setDepositError(errorMsg);
+                setDepositError(parsedError);
             }
             setDepositStatus("error");
         } finally {
@@ -759,11 +759,11 @@ function WalletDrawer({ isOpen, onClose, txHistory, reloadTxHistory }: { isOpen:
                 });
             }
         } catch (err: any) {
-            const errorMsg = err?.message || "Transaction failed";
-            if (errorMsg.includes("Timeout") || errorMsg.includes("User abort")) {
+            const parsedError = parseStarknetError(err);
+            if (parsedError.startsWith("TIMEOUT:")) {
                 setSendError("Waiting for Wallet... Please open your Argent X extension directly, as the request is likely pending there.");
             } else {
-                setSendError(errorMsg);
+                setSendError(parsedError);
             }
             setSendStatus("error");
         } finally {
