@@ -589,7 +589,7 @@ function WalletDrawer({ isOpen, onClose, txHistory, reloadTxHistory }: { isOpen:
 
     // Read Room Vault on-chain balance
     const vaultDeployed = ROOM_VAULT_ADDRESS !== "PLACEHOLDER_ROOM_VAULT_ADDRESS";
-    const { data: vaultRawBalance, refetch: refetchVault, isFetching: vaultFetching } = useReadContract({
+    const { data: vaultRawBalance, refetch: refetchVault, isFetching: vaultFetching, isError: vaultError } = useReadContract({
         abi: ROOM_VAULT_ABI,
         address: ROOM_VAULT_ADDRESS as `0x${string}`,
         functionName: "get_balance",
@@ -600,10 +600,14 @@ function WalletDrawer({ isOpen, onClose, txHistory, reloadTxHistory }: { isOpen:
     });
     const vaultBalance = (() => {
         if (!vaultDeployed) return "0.0000";
-        if (!vaultRawBalance) return "0.0000";
+        if (vaultError) return "Error";
+        if (vaultRawBalance === undefined || vaultRawBalance === null) return "---";
         try {
             return formatStrkAmount(vaultRawBalance as any);
-        } catch { return "0.0000"; }
+        } catch (e) {
+            console.error("Balance format error:", e);
+            return "0.0000";
+        }
     })();
 
     // Withdraw state (Room Vault → Argent wallet)
@@ -826,9 +830,15 @@ function WalletDrawer({ isOpen, onClose, txHistory, reloadTxHistory }: { isOpen:
                                                 <span className="text-[20px] font-bold text-gray-400 animate-pulse">Updating...</span>
                                             </div>
                                         ) : (
-                                            <span className="text-[36px] font-black">{vaultBalance}</span>
+                                            <div className="flex items-baseline gap-3">
+                                                <span className={`text-[36px] font-black ${vaultBalance === "Error" ? "text-red-400" : ""}`}>
+                                                    {vaultBalance}
+                                                </span>
+                                                {vaultBalance !== "Error" && vaultBalance !== "---" && (
+                                                    <span className="text-yellow-400 font-bold">STRK</span>
+                                                )}
+                                            </div>
                                         )}
-                                        <span className="text-yellow-400 font-bold">STRK</span>
                                     </div>
 
                                 </div>

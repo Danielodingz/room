@@ -43,8 +43,8 @@ export function StarknetProvider({ children }: { children: React.ReactNode }) {
     const provider = jsonRpcProvider({
         rpc: () => ({
             nodeUrl: process.env.NEXT_PUBLIC_STARKNET_RPC_URL ||
-                "https://free-rpc.nethermind.io/sepolia-juno",
-            requestTimeout: 60000 // Reverting to sane 60s timeout for better responsiveness
+                "https://starknet-sepolia.g.alchemy.com/starknet/version/rpc/v0_8/demo",
+            requestTimeout: 120000 // 2 minutes for maximum reliability on cold starts
         })
     });
 

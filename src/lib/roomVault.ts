@@ -81,20 +81,29 @@ export function formatStrkAmount(raw: any): string {
     try {
         if (typeof raw === "bigint") {
             value = raw;
+        } else if (Array.isArray(raw) && raw.length >= 2) {
+            // Some RPCs return [low, high]
+            value = BigInt(raw[0].toString()) + BigInt(raw[1].toString()) * HIGH_MULT;
         } else if (typeof raw === "object" && "low" in raw) {
             value = BigInt(raw.low.toString()) + BigInt(raw.high.toString()) * HIGH_MULT;
         } else if (typeof raw === "string" || typeof raw === "number") {
             value = BigInt(raw);
         } else {
-            console.warn("Unexpected STRK balance format:", raw);
-            value = 0n;
+            console.warn("Unexpected STRK balance format:", typeof raw, raw);
+            // Try to force stringify and parse
+            value = BigInt(raw.toString().replace(/[^0-9]/g, ''));
         }
     } catch (e) {
         console.error("Error formatting STRK amount:", e);
         return "0.0000";
     }
 
-    return (Number(value) / 1e18).toFixed(4);
+    // Convert to string with 18 decimals, then insert point
+    let s = value.toString();
+    while (s.length <= 18) s = "0" + s;
+    const whole = s.slice(0, s.length - 18) || "0";
+    const fraction = s.slice(s.length - 18, s.length - 18 + 4); // Keep 4 decimals
+    return `${whole}.${fraction}`;
 }
 
 // --- Error message parser ---
