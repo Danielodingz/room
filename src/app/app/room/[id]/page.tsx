@@ -9,7 +9,7 @@ import {
     ScreenShare, MoreHorizontal, PhoneOff, Maximize2,
     ChevronUp, X, MessageCircle, Paperclip, SmilePlus, Send,
     ShieldCheck, Gift, Loader2, Hand, CheckCircle2, AlertCircle,
-    ExternalLink, AtSign, DollarSign, FileText
+    ExternalLink, AtSign, DollarSign, FileText, Info
 } from "lucide-react";
 import { useAccount } from "@starknet-react/core";
 import { ROOM_VAULT_ADDRESS, toU256Calldata, ROOM_VAULT_ABI, formatStrkAmount, parseStarknetError } from "@/lib/roomVault";
@@ -918,12 +918,16 @@ function RoomInterface({
                             ) : txStatus === "error" ? (
                                 /* Error state */
                                 <div className="flex flex-col items-center gap-4 py-4">
-                                    <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center">
-                                        <AlertCircle size={32} className="text-red-400" />
+                                    <div className={`w-16 h-16 rounded-full flex items-center justify-center ${txError.includes("Waiting for Wallet") ? "bg-blue-500/10" : "bg-red-500/10"}`}>
+                                        {txError.includes("Waiting for Wallet") ? (
+                                            <Info size={32} className="text-blue-400" />
+                                        ) : (
+                                            <AlertCircle size={32} className="text-red-400" />
+                                        )}
                                     </div>
-                                    <div className="text-center">
-                                        <p className="text-[16px] font-bold text-red-400">
-                                            {txError.includes("Waiting for Wallet") ? "Check Wallet" : "Transaction Failed"}
+                                    <div className="text-center px-4">
+                                        <p className={`text-[16px] font-bold ${txError.includes("Waiting for Wallet") ? "text-blue-400" : "text-red-400"}`}>
+                                            {txError.includes("Waiting for Wallet") ? "Confirm in Wallet" : "Transaction Failed"}
                                         </p>
                                         <p className="text-[12px] text-gray-500 mt-1 max-w-[280px] break-words">{txError}</p>
                                     </div>

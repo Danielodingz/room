@@ -97,7 +97,7 @@ export function parseStarknetError(err: any): string {
     if (msg.includes("execution has failed"))
         return "Transaction execution failed on-chain. Make sure both wallets are activated on Starknet Sepolia.";
     if (msg.includes("Timeout") || msg.includes("timeout"))
-        return "TIMEOUT: The wallet connection is taking too long. Please check your extension.";
+        return "TIMEOUT: The wallet is taking a bit longer to respond. It's likely that a request is already waiting in your Argent X extension! Please open it to confirm.";
 
     // Return a shortened version for other errors
     return msg.length > 180 ? msg.slice(0, 180) + "…" : msg;

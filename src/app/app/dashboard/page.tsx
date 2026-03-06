@@ -40,6 +40,8 @@ import {
     Hash,
     Link2,
     Pencil,
+    Info,
+    AlertCircle,
 } from "lucide-react";
 import { getProfilePic } from "@/lib/profile";
 
@@ -1028,9 +1030,19 @@ function WalletDrawer({ isOpen, onClose, txHistory, reloadTxHistory }: { isOpen:
                                     </div>
 
                                     {depositStatus === 'error' && (
-                                        <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-4 text-red-400 text-[13px]">{depositError}</div>
+                                        <div className={`rounded-2xl p-4 text-[13px] font-medium border ${depositError.includes("Waiting for Wallet")
+                                                ? "bg-blue-500/10 border-blue-500/20 text-blue-400"
+                                                : "bg-red-500/10 border-red-500/20 text-red-400"
+                                            }`}>
+                                            <div className="flex gap-3">
+                                                {depositError.includes("Waiting for Wallet") ? <Info size={16} className="shrink-0" /> : <AlertCircle size={16} className="shrink-0" />}
+                                                <div>
+                                                    <p className="font-bold mb-1">{depositError.includes("Waiting for Wallet") ? "Confirm in Wallet" : "Deposit Failed"}</p>
+                                                    {depositError}
+                                                </div>
+                                            </div>
+                                        </div>
                                     )}
-
                                     <button
                                         onClick={handleDeposit}
                                         disabled={depositStatus === 'pending' || parseFloat(depositAmount) < 0.1 || !account}
@@ -1111,8 +1123,17 @@ function WalletDrawer({ isOpen, onClose, txHistory, reloadTxHistory }: { isOpen:
                                     </div>
 
                                     {sendStatus === 'error' && (
-                                        <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-4 text-red-400 text-[13px] font-medium">
-                                            {sendError}
+                                        <div className={`rounded-2xl p-4 text-[13px] font-medium border ${sendError.includes("Waiting for Wallet")
+                                                ? "bg-blue-500/10 border-blue-500/20 text-blue-400"
+                                                : "bg-red-500/10 border-red-500/20 text-red-400"
+                                            }`}>
+                                            <div className="flex gap-3">
+                                                {sendError.includes("Waiting for Wallet") ? <Info size={16} className="shrink-0" /> : <AlertCircle size={16} className="shrink-0" />}
+                                                <div>
+                                                    <p className="font-bold mb-1">{sendError.includes("Waiting for Wallet") ? "Confirm in Wallet" : "Transaction Failed"}</p>
+                                                    {sendError}
+                                                </div>
+                                            </div>
                                         </div>
                                     )}
 
@@ -1205,7 +1226,18 @@ function WalletDrawer({ isOpen, onClose, txHistory, reloadTxHistory }: { isOpen:
                                     </div>
 
                                     {withdrawStatus === 'error' && (
-                                        <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-4 text-red-400 text-[13px]">{withdrawError}</div>
+                                        <div className={`rounded-2xl p-4 text-[13px] font-medium border ${withdrawError.includes("Waiting for Wallet")
+                                                ? "bg-blue-500/10 border-blue-500/20 text-blue-400"
+                                                : "bg-red-500/10 border-red-500/20 text-red-400"
+                                            }`}>
+                                            <div className="flex gap-3">
+                                                {withdrawError.includes("Waiting for Wallet") ? <Info size={16} className="shrink-0" /> : <AlertCircle size={16} className="shrink-0" />}
+                                                <div>
+                                                    <p className="font-bold mb-1">{withdrawError.includes("Waiting for Wallet") ? "Confirm in Wallet" : "Withdrawal Failed"}</p>
+                                                    {withdrawError}
+                                                </div>
+                                            </div>
+                                        </div>
                                     )}
 
                                     <button
