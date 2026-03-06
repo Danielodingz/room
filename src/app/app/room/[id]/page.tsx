@@ -284,6 +284,7 @@ function RoomInterface({
     const [txStatus, setTxStatus] = useState<"idle" | "pending" | "success" | "error">("idle");
     const [txHash, setTxHash] = useState("");
     const [txError, setTxError] = useState("");
+    const isSendingRef = useRef(false);
     // ── Payment received notification ──
     const [paymentNotif, setPaymentNotif] = useState<{ from: string, amount: string } | null>(null);
 
@@ -439,10 +440,13 @@ function RoomInterface({
 
     const handleSendToken = async () => {
         if (!account || !usdcRecipient) return;
+        if (isSendingRef.current) return;
+
         const finalAmount = customAmount ? parseFloat(customAmount) : usdcAmount;
         if (!finalAmount || finalAmount < TOKEN_MIN) return;
 
         try {
+            isSendingRef.current = true;
             setTxStatus("pending");
 
             const [low, high] = toU256Calldata(finalAmount);
@@ -491,6 +495,8 @@ function RoomInterface({
             console.error("Token send error:", err);
             setTxError(parseStarknetError(err));
             setTxStatus("error");
+        } finally {
+            isSendingRef.current = false;
         }
     };
 
