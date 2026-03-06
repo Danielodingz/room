@@ -27,7 +27,7 @@ export default function About() {
                         Room is more than just a meeting tool.
                     </p>
                     <p className="text-[15.1px] text-[#545454] leading-[24px] font-normal">
-                        Room is a collaborative digital space where people come together to learn, build, and innovate. It allows communities to create interactive rooms for hackathons, classes, workshops, and discussions, making collaboration simple and engaging.With seamless wallet connection on StarkNet, organizers can also send rewards in StarkNet Token (STRK) directly to participants through wallet-to-wallet transfers, making it easy to recognize and incentivize contributions in real time.
+                        Room is a collaborative digital space where people come together to learn, build, and innovate. It allows communities to create interactive rooms for hackathons, classes, workshops, and discussions, making collaboration simple and engaging. With seamless wallet connection on StarkNet, organizers can also send rewards in StarkNet Token (STRK) directly to participants through wallet-to-wallet transfers, making it easy to recognize and incentivize contributions in real time.
                     </p>
                 </div>
                 <div className="flex items-center gap-4 pt-4">
