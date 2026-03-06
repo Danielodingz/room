@@ -24,10 +24,10 @@ export default function About() {
                 <h2 className="heading-2 !text-left !justify-start">About Us</h2>
                 <div className="space-y-6">
                     <p className="text-[18px] text-[#121212] leading-[29px] font-bold">
-                        Room is a decentralized video meeting platform that lets people connect through high-quality audio and video while staying in control of their data and assets.
+                        Room is more than just a meeting tool—it’s a decentralized communication layer designed for the next era of the internet. By leveraging Starknet’s high-performance infrastructure, we’ve built a platform where your data stays yours, and your interactions create real value.
                     </p>
                     <p className="text-[15.1px] text-[#545454] leading-[24px] font-normal">
-                        Unlike traditional meeting tools, Room is built on decentralized infrastructure and enables users to send tokens live during calls — directly from wallet to wallet. Room is designed for creators, communities, teams, and anyone who believes communication should be easy, secure, and transparent.
+                        From live token streaming to secure, wallet-to-wallet asset transfers, Room integrates financial sovereignty directly into your video calls. Whether you're hosting a global hybrid hackathon, teaching decentralized classes, or a DAO coordinating its next move, Room provides the transparency and security that centralized platforms can't match.
                     </p>
                 </div>
                 <div className="flex items-center gap-4 pt-4">
