@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { useAccount, useDisconnect, useReadContract } from "@starknet-react/core";
 import { loadTxHistory, saveTx, TxRecord } from "@/lib/txHistory";
 import { upcomingMeetings, ScheduledMeeting, deleteScheduledMeeting } from "@/lib/scheduledMeetings";
