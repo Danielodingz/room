@@ -4,21 +4,21 @@ export default function Process() {
     const steps = [
         {
             title: "Connect Your Wallet",
-            description: "Bind your wallet address you want to use with everything with Starknet features.",
+            description: "Securely connect your wallet to access rooms, interact with others, and manage your tokens seamlessly.",
             image: "/assets/images/process_wallet.png",
             icon: null,
             btn: null
         },
         {
             title: "Create or Join a Room",
-            description: "Name your room setting with beautiful features as simple as connecting with our room features.",
+            description: "Start your own room or join an existing one to collaborate, host discussions, classes, or community events.",
             image: "/assets/images/process_room.png",
             icon: null,
             btn: null
         },
         {
             title: "Send Token Gifts",
-            description: "The numerous brand clips are ready when call is connecting experience and decentralized.",
+            description: "Show appreciation by sending token gifts to participants, speakers, or community members during sessions.",
             image: "/assets/images/process_send_gifts.png",
             icon: null,
             btn: null

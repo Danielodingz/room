@@ -5,16 +5,16 @@ import { ChevronDown } from "lucide-react";
 
 const faqData = [
     {
-        question: "What is Room about?",
-        answer: "Room is a decentralized video meeting platform that lets people connect through real-time audio and video while sending tokens like gifts during calls — directly from wallet to wallet."
+        question: "What is a Room?",
+        answer: "A Room is a shared space where people can meet, collaborate, host discussions, run classes, or organize hackathons in real time."
     },
     {
-        question: "How do I secure my account?",
-        answer: "Since Room is Starknet-native, your account is secured by your wallet. You don't need a password; your private keys stay with you."
+        question: "Do I need a wallet to use Rooms?",
+        answer: "Yes. Connecting your wallet allows you to access rooms, interact with participants, and send token gifts securely."
     },
     {
-        question: "Do I need coding experience?",
-        answer: "Not at all. Room is designed to be as simple as any other video conferencing tool, but with the added power of blockchain features built right in."
+        question: "How do I join a Room?",
+        answer: "You can join a room through an invite link or by selecting an available room on the platform."
     }
 ];
 
