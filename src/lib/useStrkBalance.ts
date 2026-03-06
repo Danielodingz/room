@@ -57,9 +57,25 @@ export function useStrkBalance(walletAddress?: string) {
     }
 
     // STRK has 18 decimals
-    const formatted = raw > 0n
-        ? (Number(raw) / 1e18).toFixed(4)
-        : "0.0000";
+    const formatted = vaultBalanceFormatter(data);
 
     return { formatted, raw, isLoading };
+}
+
+function vaultBalanceFormatter(data: any): string {
+    if (data === null || data === undefined) return "0.0000";
+    const HIGH_MULT = 340282366920938463463374607431768211456n;
+    let value = 0n;
+    try {
+        if (typeof data === "bigint") {
+            value = data;
+        } else if (typeof data === "object" && "low" in data) {
+            value = BigInt(data.low.toString()) + BigInt(data.high.toString()) * HIGH_MULT;
+        } else {
+            value = BigInt(data.toString());
+        }
+    } catch {
+        value = 0n;
+    }
+    return (Number(value) / 1e18).toFixed(4);
 }

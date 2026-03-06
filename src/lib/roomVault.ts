@@ -72,14 +72,28 @@ export function toU256Calldata(amount: number): [string, string] {
 
 
 /** Format a raw u256 ({low, high} or bigint) to human-readable STRK string */
-export function formatStrkAmount(raw: bigint | { low: bigint; high: bigint }): string {
+export function formatStrkAmount(raw: any): string {
+    if (raw === null || raw === undefined) return "0.0000";
+
     const HIGH_MULT = 340282366920938463463374607431768211456n;
     let value = 0n;
-    if (typeof raw === "bigint") {
-        value = raw;
-    } else {
-        value = BigInt(raw.low.toString()) + BigInt(raw.high.toString()) * HIGH_MULT;
+
+    try {
+        if (typeof raw === "bigint") {
+            value = raw;
+        } else if (typeof raw === "object" && "low" in raw) {
+            value = BigInt(raw.low.toString()) + BigInt(raw.high.toString()) * HIGH_MULT;
+        } else if (typeof raw === "string" || typeof raw === "number") {
+            value = BigInt(raw);
+        } else {
+            console.warn("Unexpected STRK balance format:", raw);
+            value = 0n;
+        }
+    } catch (e) {
+        console.error("Error formatting STRK amount:", e);
+        return "0.0000";
     }
+
     return (Number(value) / 1e18).toFixed(4);
 }
 
