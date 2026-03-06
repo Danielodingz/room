@@ -582,6 +582,9 @@ function WalletDrawer({ isOpen, onClose, txHistory, reloadTxHistory }: { isOpen:
     const { formatted: strkFormatted, isLoading: balanceLoading } = useStrkBalance(address);
     const formattedBalance = balanceLoading ? "Loading..." : `${strkFormatted} STRK`;
 
+    // Global processing ref for dashboard wallet actions
+    const isProcessingRef = useRef(false);
+
     // Read Room Vault on-chain balance
     const vaultDeployed = ROOM_VAULT_ADDRESS !== "PLACEHOLDER_ROOM_VAULT_ADDRESS";
     const { data: vaultRawBalance, refetch: refetchVault, isFetching: vaultFetching } = useReadContract({
@@ -612,7 +615,10 @@ function WalletDrawer({ isOpen, onClose, txHistory, reloadTxHistory }: { isOpen:
         if (!account || !withdrawTo.trim()) return;
         const amount = parseFloat(withdrawAmount);
         if (!amount || amount < 0.001) return;
+        if (isProcessingRef.current) return;
+
         try {
+            isProcessingRef.current = true;
             setWithdrawStatus("pending");
             const [low, high] = toU256Calldata(amount);
             const result = await account.execute([{
@@ -639,6 +645,8 @@ function WalletDrawer({ isOpen, onClose, txHistory, reloadTxHistory }: { isOpen:
         } catch (err: any) {
             setWithdrawError(err?.message || "Withdrawal failed");
             setWithdrawStatus("error");
+        } finally {
+            isProcessingRef.current = false;
         }
     };
 
@@ -651,7 +659,10 @@ function WalletDrawer({ isOpen, onClose, txHistory, reloadTxHistory }: { isOpen:
         if (!account) return;
         const amount = parseFloat(depositAmount);
         if (!amount || amount < 0.1) return;
+        if (isProcessingRef.current) return;
+
         try {
+            isProcessingRef.current = true;
             setDepositStatus("pending");
             const [low, high] = toU256Calldata(amount);
             // Step 1: approve vault to spend STRK
@@ -686,6 +697,8 @@ function WalletDrawer({ isOpen, onClose, txHistory, reloadTxHistory }: { isOpen:
         } catch (err: any) {
             setDepositError(err?.message || "Deposit failed");
             setDepositStatus("error");
+        } finally {
+            isProcessingRef.current = false;
         }
     };
     // Load tx history from localStorage
@@ -709,7 +722,10 @@ function WalletDrawer({ isOpen, onClose, txHistory, reloadTxHistory }: { isOpen:
         if (!account || !sendTo.trim()) return;
         const amount = parseFloat(sendAmount);
         if (!amount || amount < TOKEN_MIN) return;
+        if (isProcessingRef.current) return;
+
         try {
+            isProcessingRef.current = true;
             setSendStatus("pending");
             const [low, high] = toU256Calldata(amount);
             const result = await account.execute([{
@@ -735,6 +751,8 @@ function WalletDrawer({ isOpen, onClose, txHistory, reloadTxHistory }: { isOpen:
         } catch (err: any) {
             setSendError(err?.message || "Transaction failed");
             setSendStatus("error");
+        } finally {
+            isProcessingRef.current = false;
         }
     };
 
