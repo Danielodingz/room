@@ -493,7 +493,12 @@ function RoomInterface({
             sendPaymentNotif(new TextEncoder().encode(notifPayload), { reliable: true });
         } catch (err: any) {
             console.error("Token send error:", err);
-            setTxError(parseStarknetError(err));
+            const parsedError = parseStarknetError(err);
+            if (parsedError.includes("Timeout") || parsedError.includes("User abort")) {
+                setTxError("Waiting for Wallet... Please open your Argent X extension directly, as the request is likely pending there.");
+            } else {
+                setTxError(parsedError);
+            }
             setTxStatus("error");
         } finally {
             isSendingRef.current = false;
@@ -932,15 +937,27 @@ function RoomInterface({
                                         <AlertCircle size={32} className="text-red-400" />
                                     </div>
                                     <div className="text-center">
-                                        <p className="text-[16px] font-bold text-red-400">Transaction Failed</p>
+                                        <p className="text-[16px] font-bold text-red-400">
+                                            {txError.includes("Waiting for Wallet") ? "Check Wallet" : "Transaction Failed"}
+                                        </p>
                                         <p className="text-[12px] text-gray-500 mt-1 max-w-[280px] break-words">{txError}</p>
                                     </div>
-                                    <button
-                                        onClick={() => setTxStatus("idle")}
-                                        className="px-6 py-2.5 bg-white/5 rounded-xl text-[13px] font-bold hover:bg-white/10 transition-colors"
-                                    >
-                                        Try Again
-                                    </button>
+                                    {!txError.includes("Waiting for Wallet") && (
+                                        <button
+                                            onClick={() => setTxStatus("idle")}
+                                            className="px-6 py-2.5 bg-white/5 rounded-xl text-[13px] font-bold hover:bg-white/10 transition-colors"
+                                        >
+                                            Try Again
+                                        </button>
+                                    )}
+                                    {txError.includes("Waiting for Wallet") && (
+                                        <button
+                                            onClick={() => setTxStatus("idle")}
+                                            className="px-6 py-2.5 bg-white/5 rounded-xl text-[13px] font-bold hover:bg-white/10 transition-colors mt-2 text-gray-400 hover:text-white"
+                                        >
+                                            I've checked, cancel
+                                        </button>
+                                    )}
                                 </div>
                             ) : (
                                 /* Normal send form */

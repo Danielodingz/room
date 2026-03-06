@@ -643,7 +643,12 @@ function WalletDrawer({ isOpen, onClose, txHistory, reloadTxHistory }: { isOpen:
             }
             refetchVault();
         } catch (err: any) {
-            setWithdrawError(err?.message || "Withdrawal failed");
+            const errorMsg = err?.message || "Withdrawal failed";
+            if (errorMsg.includes("Timeout") || errorMsg.includes("User abort")) {
+                setWithdrawError("Waiting for Wallet... Please open your Argent X extension directly, as the request is likely pending there.");
+            } else {
+                setWithdrawError(errorMsg);
+            }
             setWithdrawStatus("error");
         } finally {
             isProcessingRef.current = false;
@@ -695,7 +700,12 @@ function WalletDrawer({ isOpen, onClose, txHistory, reloadTxHistory }: { isOpen:
             }
             refetchVault();
         } catch (err: any) {
-            setDepositError(err?.message || "Deposit failed");
+            const errorMsg = err?.message || "Deposit failed";
+            if (errorMsg.includes("Timeout") || errorMsg.includes("User abort")) {
+                setDepositError("Waiting for Wallet... Please open your Argent X extension directly, as the request is likely pending there.");
+            } else {
+                setDepositError(errorMsg);
+            }
             setDepositStatus("error");
         } finally {
             isProcessingRef.current = false;
@@ -749,7 +759,12 @@ function WalletDrawer({ isOpen, onClose, txHistory, reloadTxHistory }: { isOpen:
                 });
             }
         } catch (err: any) {
-            setSendError(err?.message || "Transaction failed");
+            const errorMsg = err?.message || "Transaction failed";
+            if (errorMsg.includes("Timeout") || errorMsg.includes("User abort")) {
+                setSendError("Waiting for Wallet... Please open your Argent X extension directly, as the request is likely pending there.");
+            } else {
+                setSendError(errorMsg);
+            }
             setSendStatus("error");
         } finally {
             isProcessingRef.current = false;
