@@ -5,7 +5,7 @@ import { generateMeetingToken } from "@/lib/livekit";
 export async function POST(req: NextRequest) {
     try {
         const body = await req.json();
-        const { roomId, walletAddress, displayName } = body;
+        const { roomId, walletAddress, displayName, avatarUrl, email } = body;
 
         if (!roomId || typeof roomId !== "string" || !walletAddress || typeof walletAddress !== "string") {
             return NextResponse.json(
@@ -61,7 +61,9 @@ export async function POST(req: NextRequest) {
             normalizedRoomId,
             walletAddress,
             displayName || "Guest",
-            "participant"
+            "participant",
+            avatarUrl,
+            email
         );
 
         return NextResponse.json({ token, livekitUrl: url });

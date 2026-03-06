@@ -5,13 +5,17 @@ export type ParticipantRole = "host" | "participant";
 export interface ParticipantMetadata {
     role: ParticipantRole;
     displayName?: string;
+    avatarUrl?: string;
+    email?: string;
 }
 
 export async function generateMeetingToken(
     meetingId: string,
     walletAddress: string,
     displayName: string,
-    role: ParticipantRole
+    role: ParticipantRole,
+    avatarUrl?: string,
+    email?: string
 ): Promise<{ token: string, livekitUrl: string }> {
 
     // Access environment variables securely on the server
@@ -23,7 +27,7 @@ export async function generateMeetingToken(
         throw new Error("Server misconfiguration: Missing LiveKit credentials");
     }
 
-    const metadata: ParticipantMetadata = { role, displayName };
+    const metadata: ParticipantMetadata = { role, displayName, avatarUrl, email };
 
     // Create LiveKit AccessToken
     const token = new AccessToken(apiKey, apiSecret, {

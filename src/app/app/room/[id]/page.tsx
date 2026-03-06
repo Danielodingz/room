@@ -67,6 +67,8 @@ export default function MeetingRoomPage() {
     const [displayName, setDisplayName] = useState("");
     const [initialMicEnabled, setInitialMicEnabled] = useState(true);
     const [initialVideoEnabled, setInitialVideoEnabled] = useState(true);
+    const [avatarUrl, setAvatarUrl] = useState("");
+    const [email, setEmail] = useState("");
 
     // Mark mounted so wallet adapter has had a full render cycle to reconnect
     useEffect(() => {
@@ -92,7 +94,7 @@ export default function MeetingRoomPage() {
                     const createRes = await fetch("/api/room/create", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ roomId: meetingId, walletAddress: address, displayName }),
+                        body: JSON.stringify({ roomId: meetingId, walletAddress: address, displayName, avatarUrl, email }),
                         signal: controller.signal
                     });
 
@@ -109,7 +111,7 @@ export default function MeetingRoomPage() {
                     const res = await fetch("/api/room/join", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ roomId: meetingId, walletAddress: address, displayName }),
+                        body: JSON.stringify({ roomId: meetingId, walletAddress: address, displayName, avatarUrl, email }),
                         signal: controller.signal
                     });
 
@@ -131,16 +133,18 @@ export default function MeetingRoomPage() {
         };
 
         fetchToken();
-    }, [address, meetingId, preJoinComplete, displayName]);
+    }, [address, meetingId, preJoinComplete, displayName, avatarUrl, email]);
 
     const handleEndMeeting = () => {
         router.push("/app/dashboard");
     };
 
-    const handlePreJoinSubmit = (name: string, mic: boolean, video: boolean) => {
+    const handlePreJoinSubmit = (name: string, mic: boolean, video: boolean, avatar?: string, mail?: string) => {
         setDisplayName(name);
         setInitialMicEnabled(mic);
         setInitialVideoEnabled(video);
+        if (avatar) setAvatarUrl(avatar);
+        if (mail) setEmail(mail);
         setPreJoinComplete(true);
     };
 
@@ -149,6 +153,7 @@ export default function MeetingRoomPage() {
             <PreJoinScreen
                 onSubmit={handlePreJoinSubmit}
                 onCancel={handleEndMeeting}
+                address={address}
             />
         );
     }
@@ -201,18 +206,27 @@ export default function MeetingRoomPage() {
 
 // ─── Custom Avatar Overlay for Video Tiles ───────────────────────────────────────
 function CustomAvatarOverlay() {
-    const { identity, name } = useParticipantContext();
+    const { identity, metadata, name } = useParticipantContext();
     const trackRef = useTrackRefContext();
     const isMuted = useIsMuted(trackRef);
 
     // Only show the custom avatar if the camera is muted or not published
     if (!isMuted && trackRef.source === Track.Source.Camera) return null;
 
+    let avatarSrc = getProfilePic(identity);
+    if (metadata) {
+        try {
+            const parsed = JSON.parse(metadata);
+            if (parsed.avatarUrl) avatarSrc = parsed.avatarUrl;
+        } catch (e) { }
+    }
+
     return (
         <>
             <div className="absolute inset-0 bg-[#1C1C1E] pointer-events-none" style={{ zIndex: 1 }} />
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ zIndex: 2 }}>
-                <img src={getProfilePic(identity)} alt={name || "User"} className="w-24 h-24 rounded-full border-2 border-white/10 object-cover shadow-2xl" />
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={avatarSrc} alt={name || "User"} className="w-24 h-24 rounded-full border-2 border-white/10 object-cover shadow-2xl" />
             </div>
         </>
     );

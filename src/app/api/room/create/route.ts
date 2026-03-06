@@ -5,7 +5,7 @@ import { generateMeetingToken } from "@/lib/livekit";
 export async function POST(req: NextRequest) {
     try {
         const body = await req.json();
-        const { roomId, walletAddress, displayName } = body;
+        const { roomId, walletAddress, displayName, avatarUrl, email } = body;
 
         // Validate walletAddress as it represents the Host's identity
         if (!walletAddress || typeof walletAddress !== "string" || !roomId || typeof roomId !== "string") {
@@ -17,13 +17,17 @@ export async function POST(req: NextRequest) {
 
         // 1. Create the session in memory using the frontend's specific ID.
         const meetingId = createMeeting(roomId, walletAddress);
+        // Assuming meetingId is the normalizedRoomId for LiveKit
+        const normalizedRoomId = meetingId;
 
         // 2. Generate the LiveKit Token explicitly for the Host Role
-        const { token, livekitUrl } = await generateMeetingToken(
-            meetingId,
+        const { token, livekitUrl: url } = await generateMeetingToken(
+            normalizedRoomId,
             walletAddress,
-            displayName || "Host",
-            "host" // <-- Crucial Role Injection
+            displayName || "Guest",
+            "host", // <-- Crucial Role Injection
+            avatarUrl,
+            email
         );
 
         // 3. Construct the Join URL
@@ -35,7 +39,7 @@ export async function POST(req: NextRequest) {
             meetingId,
             joinUrl,
             token,
-            livekitUrl,
+            livekitUrl: url,
         });
     } catch (error: any) {
         console.error("Error creating room:", error);

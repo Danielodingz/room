@@ -1,17 +1,20 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Mic, MicOff, Video, VideoOff, Settings, Check } from "lucide-react";
+import { Mic, MicOff, Video, VideoOff, Settings, Check, User } from "lucide-react";
 import { createLocalAudioTrack, createLocalVideoTrack, LocalVideoTrack, LocalAudioTrack } from "livekit-client";
+import { loadProfile, getProfilePic } from "@/lib/profile";
 
 export default function PreJoinScreen({
     onSubmit,
     onCancel,
-    defaultName = ""
+    defaultName = "",
+    address
 }: {
-    onSubmit: (name: string, isMicEnabled: boolean, isVideoEnabled: boolean) => void,
+    onSubmit: (name: string, isMicEnabled: boolean, isVideoEnabled: boolean, avatarUrl?: string, email?: string) => void,
     onCancel: () => void,
-    defaultName?: string
+    defaultName?: string,
+    address?: string
 }) {
     const [name, setName] = useState(defaultName);
     const [isMicEnabled, setIsMicEnabled] = useState(true);
@@ -19,11 +22,19 @@ export default function PreJoinScreen({
     const [videoTrack, setVideoTrack] = useState<LocalVideoTrack | null>(null);
     const [audioTrack, setAudioTrack] = useState<LocalAudioTrack | null>(null);
     const [error, setError] = useState<string>("");
+    const [avatarUrl, setAvatarUrl] = useState<string>("");
+    const [email, setEmail] = useState<string>("");
 
     useEffect(() => {
-        // We intentionally don't load from local storage
-        // to force the user to enter their name each time.
-    }, []);
+        if (address) {
+            const profile = loadProfile(address);
+            if (profile) {
+                if (profile.displayName) setName(profile.displayName);
+                if (profile.avatarUrl) setAvatarUrl(profile.avatarUrl);
+                if (profile.email) setEmail(profile.email);
+            }
+        }
+    }, [address]);
 
     useEffect(() => {
         let active = true;
@@ -72,7 +83,7 @@ export default function PreJoinScreen({
         if (videoTrack) videoTrack.stop();
         if (audioTrack) audioTrack.stop();
 
-        onSubmit(finalName, isMicEnabled, isVideoEnabled);
+        onSubmit(finalName, isMicEnabled, isVideoEnabled, avatarUrl, email);
     };
 
     const toggleVideo = async () => {
