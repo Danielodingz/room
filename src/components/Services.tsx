@@ -33,8 +33,8 @@ export default function Services() {
 
                 <div className="bg-[#121212] rounded-[24px] shadow-[0px_50px_35px_-1.5px_rgba(0,0,0,0.08)] p-8 h-[389px] flex flex-col justify-end relative overflow-hidden group">
                     <Image
-                        src="/assets/images/service_short_form.jpg"
-                        alt="Short-form edits"
+                        src="/assets/images/service_schedule_meeting.png"
+                        alt="Schedule a Meeting"
                         fill
                         className="object-cover opacity-60"
                     />
