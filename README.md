@@ -12,19 +12,26 @@
 
 ## The Problem
 
-Builders, learners, and communities lack a unified space that seamlessly integrates high-quality video collaboration with native Web3 token incentives. Currently, hosts face:
+The Web3 ecosystem is built on the promise of seamless, borderless value transfer, yet the tools we use to build, learn, and collaborate in this space remain stuck in Web2 walled gardens. 
 
-1. **Fragmented Workflows** — Switching between Web2 video conferencing apps and Web3 wallets to send rewards.
-2. **Friction in Onboarding** — Relying on disjointed tools for hackathons, classes, and live collaboration.
-3. **Complicated Token Mechanics** — Difficulty in rewarding participants instantly without manual, time-consuming token transfers.
+For DAO builders, educators, and hackathon organizers, **coordinating humans and capital** currently requires a fragmented, high-friction workflow. Today, hosts are forced to:
+
+1. **Juggle Disjointed Platforms:** Use Google Meet or Zoom for video, Telegram/Discord for chat, and a separate block explorer or wallet extension just to distribute rewards or verify holdings.
+2. **Endure Manual Token Distribution:** Sending bounties, paying for class access, or tipping great questions requires copy-pasting addresses, manually signing transactions, and waiting for slow block times—completely killing the live momentum.
+3. **Lack Verifiable Context:** Meeting organizers have no native way to gate access based on token holdings or ensure the person speaking is actually the active contributor on-chain.
 
 ---
 
 ## The Solution
 
-**Collaborate Live. Reward Instantly.**
+**Room: WebRTC meets native Starknet execution.** 
 
-Room is a decentralized meeting platform built natively on **Starknet** that allows users to host hackathons, run classes, collaborate live, and reward participants instantly with STRK. By bringing seamless wallet connections and high-quality video into a single interface, Room makes Web3 communities truly interactive.
+Room is not just another video conferencing app; it is a **Starknet-native collaboration environment**. By deeply integrating high-quality, low-latency video (powered by LiveKit) with Cairo smart contracts, Room allows communities to collaborate face-to-face and move capital in the same breath.
+
+**With Room, you can:**
+- **Reward in Real-Time:** Send STRK tokens to a participant *during* a hackathon presentation or a workshop, instantly, without ever leaving the video grid.
+- **Transact at Scale:** Leverage Starknet's high throughput and low fees to make micro-transactions (tips, bounties, class access) economically viable.
+- **Unified Identity:** Your Starknet wallet (Argent/Braavos) is your identity. No usernames, no passwords—just cryptographic proof of who you are and what you hold.
 
 ### How It Works
 
