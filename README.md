@@ -33,25 +33,52 @@ Room is not just another video conferencing app; it is a **Starknet-native colla
 - **Transact at Scale:** Leverage Starknet's high throughput and low fees to make micro-transactions (tips, bounties, class access) economically viable.
 - **Unified Identity:** Your Starknet wallet (Argent/Braavos) is your identity. No usernames, no passwords—just cryptographic proof of who you are and what you hold.
 
-### How It Works
+## Technical Architecture
 
-```
-┌─────────────────┐     ┌──────────────┐     ┌─────────────────────┐
-│   User Wallet   │────▶│   Next.js    │────▶│  RoomVault Contract │
-│(Argent/Braavos) │     │  Frontend    │     │  (Starknet Sepolia) │
-└─────────────────┘     └──────────────┘     └─────────────────────┘
-                               │                       │
-                               ▼                       ▼
-                        ┌──────────────┐     ┌─────────────────────┐
-                        │   LiveKit    │     │      STRK Token     │
-                        │   Server     │     │      Transfers      │
-                        │  (WebRTC)    │     │                     │
-                        └──────────────┘     └─────────────────────┘
+Room leverages a hybrid architecture, combining Web2 real-time video infrastructure with Web3 decentralized identity and settlement.
+
+```mermaid
+graph TD
+    subgraph Client ["Client / Browser Interfaces"]
+        UI["Next.js Web App\n(React, Tailwind)"]
+        Wallet["Starknet Wallet\n(Argent X / Braavos)"]
+    end
+
+    subgraph Infrastructure ["Real-time Infrastructure"]
+        LK["LiveKit Server\n(WebRTC SFU)"]
+    end
+
+    subgraph Blockchain ["Starknet Network (Sepolia)"]
+        Vault["RoomVault Contract\n(Cairo dApp)"]
+        STRK["STRK ERC-20 Token"]
+    end
+
+    %% Flow connections
+    UI <-->|WebRTC Video/Audio| LK
+    UI <-->|Connects & Signs| Wallet
+    Wallet -->|Executes Transaction| Vault
+    Vault -.->|Transfers Balance| STRK
+    
+    %% Styling
+    classDef frontend fill:#f9f9f9,stroke:#333,stroke-width:2px;
+    classDef realtime fill:#e3e2ff,stroke:#5c5cff,stroke-width:2px;
+    classDef onchain fill:#d4f1f4,stroke:#05445e,stroke-width:2px;
+    
+    class UI,Wallet frontend;
+    class LK realtime;
+    class Vault,STRK onchain;
 ```
 
-1. **Authentication** — Users connect their Starknet wallets to authenticate and manage their identities
-2. **Collaboration** — Participants join LiveKit-powered video and audio meeting rooms
-3. **Incentivization** — Hosts and users manage their balances and facilitate seamless STRK token transfers directly via the Starknet RoomVault contract
+### Core Components
+
+1. **Next.js & Starknetkit (Frontend)**
+   The main entry point manages the user interface, video grids, profile customization, and wallet connection. It explicitly connects to Starknet wallets using `starknetkit` and `@starknet-react/core` to authenticate via digital signatures.
+   
+2. **LiveKit Server (WebRTC)**
+   Handles the heavy lifting of routing multi-party video and audio streams seamlessly with ultra-low latency. It generates secure tokens for validated attendees to enter designated collaboration rooms.
+
+3. **RoomVault Contract (Cairo)**
+   A pure native Starknet smart contract that handles deposits, tracks individual and event balances, and enforces the peer-to-peer distribution flow of STRK tokens among participants—bypassing lengthy cross-chain bridges.
 
 ---
 
