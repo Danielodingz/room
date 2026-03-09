@@ -1,0 +1,8 @@
+# Exclude certain large frontend directories from GitHub language stats
+# to help smaller languages like Cairo (smart contracts) show up.
+# You can uncomment these to hide frontend code from stats completely:
+src/** linguist-vendored
+public/** linguist-vendored
+
+# Ensure Cairo is recognized
+*.cairo linguist-language=Cairo
