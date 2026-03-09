@@ -37,37 +37,7 @@ Room is not just another video conferencing app; it is a **Starknet-native colla
 
 Room leverages a hybrid architecture, combining Web2 real-time video infrastructure with Web3 decentralized identity and settlement.
 
-```mermaid
-graph TD
-    subgraph Client ["Client / Browser Interfaces"]
-        UI["Next.js Web App\n(React, Tailwind)"]
-        Wallet["Starknet Wallet\n(Argent X / Braavos)"]
-    end
-
-    subgraph Infrastructure ["Real-time Infrastructure"]
-        LK["LiveKit Server\n(WebRTC SFU)"]
-    end
-
-    subgraph Blockchain ["Starknet Network (Sepolia)"]
-        Vault["RoomVault Contract\n(Cairo dApp)"]
-        STRK["STRK ERC-20 Token"]
-    end
-
-    %% Flow connections
-    UI <-->|WebRTC Video/Audio| LK
-    UI <-->|Connects & Signs| Wallet
-    Wallet -->|Executes Transaction| Vault
-    Vault -.->|Transfers Balance| STRK
-    
-    %% Styling
-    classDef frontend fill:#f9f9f9,stroke:#333,stroke-width:2px;
-    classDef realtime fill:#e3e2ff,stroke:#5c5cff,stroke-width:2px;
-    classDef onchain fill:#d4f1f4,stroke:#05445e,stroke-width:2px;
-    
-    class UI,Wallet frontend;
-    class LK realtime;
-    class Vault,STRK onchain;
-```
+![Technical Architecture](public/assets/images/tech.png)
 
 ### Core Components
 
