@@ -37,7 +37,9 @@ Room is not just another video conferencing app; it is a **Starknet-native colla
 
 Room leverages a hybrid architecture, combining Web2 real-time video infrastructure with Web3 decentralized identity and settlement.
 
-![Technical Architecture](public/assets/images/tech.png)
+<p align="center">
+  <img src="./public/assets/images/tech.png" alt="Technical Architecture" width="100%" />
+</p>
 
 ### Core Components
 
